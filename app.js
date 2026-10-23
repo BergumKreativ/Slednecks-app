@@ -117,12 +117,14 @@ const CFG=window.SLEDNECKS_CONFIG||{};
 const APP_NAME=window.APP_NAME||"Slednecks"; // Arbeidsnavn – endres ett sted i index.html
 // Demomodus (window.APP_DEMO): viser appen med eksempeldata uten innlogging. Ingenting lagres.
 const DEMO=window.APP_DEMO===true;
+// Demo: #skjerm i adressen viser én bestemt side eller ett skjema (brukes av skjermoversikten)
+const DEMO_SCREEN=DEMO?decodeURIComponent(location.hash.slice(1)):"";
 function demoClient(){
   const res={data:null,error:null};
   const chain=()=>new Proxy(()=>{},{get:(t,k)=>k==="then"?(f,r)=>Promise.resolve(res).then(f,r):()=>chain(),apply:()=>chain()});
   return{from:()=>chain(),rpc:()=>chain(),
     storage:{from:()=>({upload:async()=>res,remove:async()=>res,createSignedUrls:async()=>({data:[],error:null})})},
-    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",{user:{id:"demo",email:"demo@spatind.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
+    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@spatind.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
 }
 const sb=DEMO?demoClient():CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
@@ -134,7 +136,9 @@ try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v)
 async function loadAll(){
   if(DEMO){
     if(!S.loaded){const D=window.DEMO_DATA||{};S.profile={...S.profile,...D.profile};S.sessions=(D.sessions||[]).map(rowToSession);REP.list=D.reports||[];REP.at=Date.now()}
-    S.loaded=true;render();return;
+    const first=!S.loaded;S.loaded=true;
+    if(first)demoScreen();else render();
+    return;
   }
   const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,lisens,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
@@ -145,6 +149,17 @@ async function loadAll(){
   }
   S.sessions=ok(o).map(rowToSession);
   S.loaded=true;render();
+}
+function demoScreen(){
+  const k=DEMO_SCREEN;
+  if(["kart","velkommen","personvern"].includes(k))S.view=k;
+  if(k==="hund"){S.dog=S.profile.dogs[0];S.view="hund"}
+  S.view={"dag":"plan","endre-okt":"logg","tractive":"logg","foremelding":"kart"}[k]||S.view;
+  render();
+  const open={"ny-okt":()=>openForm(),"ny-okt-meg":()=>openForm(null,"meg"),"endre-okt":()=>openForm(S.sessions[0]),
+    "tractive":openTractive,"mal":()=>openGoal(),"tilbakemelding":openFeedback,"dag":()=>openDay(iso(addDays(planStart(),15))),
+    "foremelding":()=>openReport(61.12,10.47)}[k];
+  if(open)open();
 }
 const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
 async function refresh(){try{await loadAll()}catch(e){toast(errText(e))}}
@@ -1372,7 +1387,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)re
 
 // Startskjerm: skjules når innloggingsstatus er kjent, men vises minst 900 ms
 const SPLASH_T0=Date.now();
-function hideSplash(){const el=document.getElementById("splash");if(!el||el.classList.contains("hide"))return;setTimeout(()=>{el.classList.add("hide");setTimeout(()=>el.remove(),600)},Math.max(0,900-(Date.now()-SPLASH_T0)))}
+function hideSplash(){if(DEMO_SCREEN==="start")return;const el=document.getElementById("splash");if(!el||el.classList.contains("hide"))return;setTimeout(()=>{el.classList.add("hide");setTimeout(()=>el.remove(),600)},Math.max(0,900-(Date.now()-SPLASH_T0)))}
 const NAV_ICONS={hjem:"house",logg:"list",plan:"calendar-days",innst:"user"};
 document.querySelectorAll(".tab").forEach(t=>{t.innerHTML=`${icon(NAV_ICONS[t.dataset.v])}<span>${t.textContent}</span>`});
 document.getElementById("addBtn").innerHTML=icon("plus");
