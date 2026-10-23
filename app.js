@@ -93,19 +93,32 @@ const LOAD_LABEL={"Kløvtur":"Vekt i kløven (kg)","Kløvtrening":"Vekt i kløve
 const KROPP=[[3,"Sterk"],[2,"Ok"],[1,"Sliten"]];
 const isMe=s=>s.kategori==="meg";
 // Sesongmodus: viser bare økttyper og innhold som passer årstiden. Valget lagres på enheten.
-// Uten eget valg velges sesongen ut fra måneden (vinter des–mar, ellers barmark). Vinter har egne farger.
+// Uten eget valg følger sesongen været der du er: snittet for neste døgn under −1 °C gir Vinter, over +2 °C Barmark.
+// Rundt null, eller uten værdata, avgjør måneden (vinter des–mar). Vinter har egne farger.
 const SEASONS={
   vinter:{label:"Vinter",dog:["Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kjettingtrekk","Annet"],me:["Ski","Løping","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
   barmark:{label:"Barmark",dog:["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Svømming","Mobilitet / yoga","Annet"]},
 };
-const autoSeason=()=>{const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":"barmark"};
+function wxSeason(){
+  const d=typeof W!=="undefined"&&W.data&&W.data.slice(0,24);
+  if(d&&d.length>=6){
+    const avg=d.reduce((a,x)=>a+x.temp,0)/d.length, k=avg<=-1?"vinter":avg>=2?"barmark":"";
+    try{localStorage.setItem("sn-wxseason",JSON.stringify({k,avg:Math.round(avg),at:Date.now()}))}catch(e){}
+    return {k,avg:Math.round(avg)};
+  }
+  // Siste vurdering fra været brukes i et døgn, så fargene ikke skifter mens appen starter
+  try{const v=JSON.parse(localStorage.getItem("sn-wxseason")||"null");if(v&&Date.now()-v.at<864e5)return v}catch(e){}
+  return null;
+}
+const autoSeason=()=>{const w=wxSeason();if(w&&w.k)return w.k;const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":"barmark"};
 const seasonPick=()=>{try{const v=localStorage.getItem("sn-season")||"";return v==="host"||v==="sommer"?"barmark":v}catch(e){return ""}};
 const season=()=>{const v=seasonPick()||autoSeason();return v==="alle"?null:v};
 const seasonTypes=kat=>{const k=season();return k?SEASONS[k][kat==="meg"?"me":"dog"]:(kat==="meg"?MY_TYPES:TYPES)};
 const inSeason=x=>{const k=season();return !k||SEASONS[k][isMe(x)?"me":"dog"].includes(typeOf(x.type,x.kategori))};
 function seasonBar(){
-  const cur=seasonPick()||autoSeason();
-  return `<div class="seasons" role="group" aria-label="Sesong">${[["barmark","Barmark"],["vinter","Vinter"],["alle","Alt"]].map(([k,l])=>`<button type="button" class="chip" data-season="${k}" aria-pressed="${cur===k}">${l}</button>`).join("")}</div>`;
+  const pick=seasonPick(),cur=pick||autoSeason(),w=wxSeason();
+  return `<div class="seasons" role="group" aria-label="Sesong">${[["barmark","Barmark"],["vinter","Vinter"],["alle","Alt"]].map(([k,l])=>`<button type="button" class="chip" data-season="${k}" aria-pressed="${cur===k}">${l}</button>`).join("")}</div>
+  <p class="small muted center" style="margin:-6px 0 10px">${pick?`Valgt av deg · <button type="button" class="linkbtn" data-season="auto">Følg været</button>`:w&&w.k?`Følger været (snitt ${w.avg} °C neste døgn)`:"Følger årstiden"}</p>`;
 }
 const typeOf=(t,kat)=>kat==="meg"?(MY_TYPES.includes(t)?t:"Annet"):ALIAS[t]||(TYPES.includes(t)?t:"Annet");
 const dogS=()=>S.sessions.filter(s=>!isMe(s)), meS=()=>S.sessions.filter(isMe);
@@ -1563,7 +1576,7 @@ function bind(){
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
   document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});
-  document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const k=b.dataset.season;try{k===autoSeason()?localStorage.removeItem("sn-season"):localStorage.setItem("sn-season",k)}catch(e){}render()});
+  document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const k=b.dataset.season;try{k==="auto"||k===autoSeason()?localStorage.removeItem("sn-season"):localStorage.setItem("sn-season",k)}catch(e){}render()});
   document.querySelectorAll("[data-dogpage]").forEach(b=>b.onclick=()=>{S.dog=b.dataset.dogpage;S.view="hund";render();window.scrollTo(0,0)});
   if(S.view==="hund"&&S.user)bindDog();
   const send=document.getElementById("l-send");
