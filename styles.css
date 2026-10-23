@@ -411,3 +411,15 @@ body.tracking{overflow:hidden}
 /* Vintertema: nordlys, fra nattblått til turkis og grønt, i stedet for solnedgangen når sesongen er Vinter */
 body.th-vinter{--grad:linear-gradient(135deg,#0A1A3F 0%,#173E7A 42%,#1B7F95 74%,#23997F 100%);--grad-btn:linear-gradient(90deg,#14336A,#1B7F95);--grad-line:linear-gradient(90deg,#2A63C0,#1FB0A6,#6FDCA0);--accent:#1A6BB5;--accent-soft:#E0EEF7}
 @media (prefers-color-scheme: dark){body.th-vinter{--accent:#5AA9E6;--accent-soft:#12283D}}
+/* Været øverst på Oversikt */
+.wxtop{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-top:12px}
+.wxmain{display:flex;align-items:center;gap:10px}
+.wxic svg{width:34px;height:34px;stroke-width:1.5}
+.wxt{font-size:2.4rem;font-weight:250;line-height:1}
+.wxtxt{line-height:1.25}
+.wxfacts{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;color:var(--ink)}
+.wxfacts span{display:inline-flex;align-items:center;gap:5px}
+.wxhours{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:10px;border-top:1px solid var(--line);padding-top:8px;text-align:center}
+.wxhours span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.wxhours small{color:var(--muted);font-size:.72rem}
+.wxhours b{font-weight:500}

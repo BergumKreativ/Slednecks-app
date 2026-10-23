@@ -505,6 +505,7 @@ function vHome(){
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${upcomingRaces()}
+  ${wxTop()}
   ${progressCard(t)}
   ${S.loaded&&!S.sessions.length?`<p class="notice center" style="margin-top:12px">${icon("route","sm")} Har du trent allerede denne sesongen? <button type="button" class="linkbtn" id="hmImport">Hent inn øktene dine</button></p>`:""}
   ${trackCard()}
@@ -519,8 +520,8 @@ function vHome(){
   </section>
   ${season()&&season()!=="vinter"?"":`${sh("route","Føre og løyper","trail")}
   ${foreCard()}`}
-  ${sh("cloud-sun","Vær og varme","wx")}
-  ${weatherCard()}
+  ${season()==="vinter"||!savedPos()?"":`${sh("thermometer","Varme og trening","wx")}
+  ${weatherCard()}`}
   ${sh("paw-print","Hundene","dog")}
   ${S.profile.dogs.length?`<div class="dogs t-dog">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
   <div class="row center" style="margin-top:28px">${sh("person-standing","Deg","me","margin:0")}<button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
@@ -540,10 +541,59 @@ async function loadWeather(force){
     const r=await fetch(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${pos.lat.toFixed(3)}&lon=${pos.lon.toFixed(3)}`);
     if(!r.ok)throw new Error(String(r.status));
     const d=await r.json();
-    W.data=d.properties.timeseries.slice(0,30).map(x=>({t:new Date(x.time),temp:x.data.instant.details.air_temperature,rh:x.data.instant.details.relative_humidity,wind:x.data.instant.details.wind_speed}));
+    W.data=d.properties.timeseries.slice(0,30).map(x=>{const n=x.data.next_1_hours||x.data.next_6_hours;return{t:new Date(x.time),temp:x.data.instant.details.air_temperature,rh:x.data.instant.details.relative_humidity,wind:x.data.instant.details.wind_speed,sym:n?n.summary.symbol_code:"",rain:x.data.next_1_hours?x.data.next_1_hours.details.precipitation_amount:null}});
     W.at=Date.now();W.err="";
+    loadPlace(pos);
   }catch(e){W.err="fetch"}
   W.loading=false;render();
+}
+// Kommunenavn for posisjonen, slik at værmeldingen viser hvor den gjelder. Lagres sammen med posisjonen.
+async function loadPlace(pos){
+  try{const c=JSON.parse(localStorage.getItem("sn-place")||"null");if(c&&Math.abs(c.lat-pos.lat)<.02&&Math.abs(c.lon-pos.lon)<.02){W.place=c.name;return}}catch(e){}
+  try{
+    const r=await fetch(`https://api.kartverket.no/kommuneinfo/v1/punkt?nord=${pos.lat.toFixed(4)}&ost=${pos.lon.toFixed(4)}&koordsys=4258`);
+    if(!r.ok)return;const d=await r.json();if(!d.kommunenavn)return;
+    W.place=d.kommunenavn;try{localStorage.setItem("sn-place",JSON.stringify({lat:pos.lat,lon:pos.lon,name:d.kommunenavn}))}catch(e){}
+    if(S.view==="hjem")render();
+  }catch(e){}
+}
+// Symbolkodene fra MET (f.eks. «partlycloudy_day») som ikon og norsk tekst
+function wxSym(code){
+  const c=String(code||"").replace(/_(day|night|polartwilight)$/,""),night=/_night$/.test(code||"");
+  if(/thunder/.test(c))return["cloud-lightning","Torden"];
+  if(/sleet/.test(c))return["cloud-rain","Sludd"];
+  if(/snow/.test(c))return["cloud-snow",/showers/.test(c)?"Snøbyger":/light/.test(c)?"Lett snø":/heavy/.test(c)?"Kraftig snø":"Snø"];
+  if(/rain/.test(c))return["cloud-rain",/showers/.test(c)?"Regnbyger":/light/.test(c)?"Lett regn":/heavy/.test(c)?"Kraftig regn":"Regn"];
+  if(c==="fog")return["cloud-fog","Tåke"];
+  if(c==="cloudy")return["cloud","Skyet"];
+  if(c==="partlycloudy")return["cloud-sun","Delvis skyet"];
+  if(c==="fair")return[night?"moon":"cloud-sun","Lettskyet"];
+  if(c==="clearsky")return[night?"moon":"sun","Klart"];
+  return["thermometer",""];
+}
+// Været øverst på Oversikt: nå, resten av dagen og de neste timene
+function wxTop(){
+  if(!savedPos()){
+    const ios=/iPhone|iPad/.test(navigator.userAgent);
+    if(W.err==="denied")return `<div class="wxtop"><p class="small"><b>${icon("cloud-sun","sm")} Posisjon er slått av</b></p>
+      <p class="small" style="margin-top:6px">${ios?"På iPhone: Innstillinger → Personvern og sikkerhet → Stedstjenester → slå på, og velg «Ved bruk av appen» for Safari-nettsteder. I Safari: trykk aA i adressefeltet → Nettstedsinnstillinger → Plassering → Tillat.":"Trykk på hengelåsen eller innstillingsikonet ved adressefeltet, og tillat posisjon for nettstedet. Sjekk også at posisjon er slått på i telefonens innstillinger."}</p>
+      <div class="actions" style="margin-top:8px"><button class="btn line sm" id="wxPos">Prøv igjen</button></div></div>`;
+    return `<div class="wxtop"><p class="small"><b>${icon("cloud-sun","sm")} Se været der du er</b></p>
+     <p class="small" style="margin-top:4px">Slå på posisjon, så viser appen temperatur, vind og værmelding der du er hver gang du åpner den. Posisjonen brukes bare til vær og kart, og lagres bare på telefonen din.</p>
+     <div class="actions" style="margin-top:8px"><button class="btn sm" id="wxPos">Slå på posisjon</button></div></div>`;
+  }
+  if(!W.data)return `<div class="wxtop"><p class="small muted center">${W.err?"Fikk ikke hentet været.":"Henter været …"}</p>${W.err?`<div class="actions" style="margin-top:6px"><button class="btn ghost sm" id="wxRetry">Prøv igjen</button></div>`:""}</div>`;
+  const now=wxNow(),[ic,txt]=wxSym(now.sym),end=new Date();end.setHours(23,59,59,999);
+  const today=W.data.filter(x=>x.t<=end),lo=Math.min(...today.map(x=>x.temp)),hi=Math.max(...today.map(x=>x.temp));
+  const rainToday=today.reduce((a,x)=>a+(x.rain||0),0);
+  const hours=W.data.filter(x=>x.t>new Date()).slice(0,6);
+  const hh=d=>String(d.getHours()).padStart(2,"0");
+  return `<div class="wxtop">
+   <div class="wxmain"><span class="wxic">${icon(ic)}</span><span class="wxt cond">${Math.round(now.temp)}°</span>
+    <span class="wxtxt"><b>${esc(txt||"Været nå")}</b><br><span class="small muted">${W.place?esc(W.place)+" · ":""}i dag ${Math.round(lo)}° til ${Math.round(hi)}°</span></span></div>
+   <div class="wxfacts small"><span>${icon("wind","sm")} ${fmtKm(now.wind)} m/s</span><span>${icon("droplets","sm")} ${Math.round(now.rh)} % fuktighet</span><span>${icon("cloud-rain","sm")} ${rainToday?fmtKm(rainToday)+" mm i dag":"Opphold i dag"}</span></div>
+   <div class="wxhours">${hours.map(x=>`<span><small>${hh(x.t)}</small>${icon(wxSym(x.sym)[0],"sm")}<b>${Math.round(x.temp)}°</b></span>`).join("")}</div>
+   <p class="small muted" style="margin:6px 0 0;font-size:.72rem">Data fra MET Norway</p></div>`;
 }
 function askPos(){
   if(!navigator.geolocation){W.err="denied";render();return}
@@ -573,8 +623,7 @@ function weatherCard(){
   const next=W.data.filter(x=>x.t>new Date()&&x.t<new Date(Date.now()+24*3600e3));
   const best=next.filter(x=>x.t.getHours()>=5&&x.t.getHours()<=22).reduce((a,x)=>!a||heatRisk(x.temp,x.rh).sum<heatRisk(a.temp,a.rh).sum?x:a,null);
   const hh=d=>d.toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
-  return `<div class="wx card t-wx"><div class="row"><b>${icon("thermometer","sm")} Vær nå</b><span class="pill ${R.c}">${R.t}</span></div>
-   <div class="wxnow"><span class="cond">${fmtKm(now.temp)}°</span><span>${Math.round(now.rh)} % fuktighet<br>${fmtKm(now.wind)} m/s vind</span></div>
+  return `<div class="wx card t-wx"><div class="row"><b>${icon("paw-print","sm")} Varme for hundene</b><span class="pill ${R.c}">${R.t}</span></div>
    <div class="wxbar" aria-label="Varmerisiko neste 24 timer">${next.map(x=>`<i class="r${heatRisk(x.temp,x.rh).lvl}" title="${hh(x.t)}: ${fmtKm(x.temp)}°, ${Math.round(x.rh)} %"></i>`).join("")}</div>
    <p class="small muted">Neste 24 timer${best&&r.lvl>0?` · svalest/tørrest kl. ${hh(best.t)}: ${fmtKm(best.temp)}°, ${Math.round(best.rh)} %`:""}</p>
    <ul class="small">${R.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
@@ -1571,7 +1620,11 @@ function bind(){
   };
   const wp=document.getElementById("wxPos");if(wp)wp.onclick=askPos;
   const wr=document.getElementById("wxRetry");if(wr)wr.onclick=()=>{W.err="";loadWeather(true);render()};
-  if(S.user&&S.view==="hjem")loadWeather();
+  if(S.user&&S.view==="hjem"){
+    // Har brukeren allerede gitt tillatelse, hentes posisjonen stille (også på en ny telefon). Ellers venter vi på knappen.
+    if(!W.asked&&navigator.permissions){W.asked=true;navigator.permissions.query({name:"geolocation"}).then(p=>{if(p.state==="granted")askPos();else if(p.state==="denied"&&!savedPos()){W.err="denied";render()}}).catch(()=>{})}
+    loadWeather();
+  }
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
