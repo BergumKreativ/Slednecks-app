@@ -99,7 +99,7 @@ window.IMPORT = (() => {
   }
 
   // Gjetter hvem som trente og hvilken type, ut fra aktivitetstypen og ord i navn og beskrivelse
-  const DOG_WORDS = /(hund|dog|canicross|bikejør|sykkeljør|skijør|snørekjør|kløv|spann|pulk|slede|mush)/i;
+  const DOG_WORDS = /(hund|dog|canicross|bikejør|sykkeljør|sykkelkjør|skijør|snørekjør|kløv|spann|pulk|slede|mush)/i;
   function guess(a, dogs) {
     const t = a.stype.toLowerCase(), txt = `${a.name} ${a.desc}`;
     const esc = d => d.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

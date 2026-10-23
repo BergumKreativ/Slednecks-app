@@ -83,11 +83,11 @@ function buildPlan(){
     return[`${snow?"❄ ":""}${name} ${k} km${note?" – "+note:""}`,k,h,key?1:0];
   })}));
 }
-const TYPES=["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"];
-const ALIAS={"Terrengsykkel":"Sykkeljøring","Sykkel":"Sykkeljøring","El-sykkel":"Sykkeljøring","Løping":"Canicross","Tur":"Gåtur","Kløv":"Kløvtur","Slede":"Hundekjøring","Vogn":"Vogn / ATV"};
+const TYPES=["Sykkelkjøring","Canicross","Sparkesykkel","Vogn / ATV","Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"];
+const ALIAS={"Sykkeljøring":"Sykkelkjøring","Terrengsykkel":"Sykkelkjøring","Sykkel":"Sykkelkjøring","El-sykkel":"Sykkelkjøring","Løping":"Canicross","Tur":"Gåtur","Kløv":"Kløvtur","Slede":"Hundekjøring","Vogn":"Vogn / ATV"};
 // Egne økter (kategori "meg") har egne typer, og teller ikke mot hundenes ukemål
 const MY_TYPES=["Løping","Styrke","Ski","Sykkel","Fjelltur / gåtur","Mobilitet / yoga","Svømming","Annet"];
-const ACTIVE_WITH_DOG=["Canicross","Skijøring","Sykkeljøring","Gåtur","Kløvtur","Pulk"];
+const ACTIVE_WITH_DOG=["Canicross","Skijøring","Sykkelkjøring","Gåtur","Kløvtur","Pulk"];
 // Økttyper der vekten på lasten føres
 const LOAD_LABEL={"Kløvtur":"Vekt i kløven (kg)","Kløvtrening":"Vekt i kløven (kg)","Kjettingtrekk":"Kjettingvekt (kg)"};
 const KROPP=[[3,"Sterk"],[2,"Ok"],[1,"Sliten"]];
@@ -97,7 +97,7 @@ const isMe=s=>s.kategori==="meg";
 // Rundt null, eller uten værdata, avgjør måneden (vinter des–mar). Vinter har egne farger.
 const SEASONS={
   vinter:{label:"Vinter",dog:["Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kjettingtrekk","Annet"],me:["Ski","Løping","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
-  barmark:{label:"Barmark",dog:["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Svømming","Mobilitet / yoga","Annet"]},
+  barmark:{label:"Barmark",dog:["Sykkelkjøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Svømming","Mobilitet / yoga","Annet"]},
 };
 function wxSeason(){
   const d=typeof W!=="undefined"&&W.data&&W.data.slice(0,24);
@@ -112,9 +112,9 @@ function wxSeason(){
 }
 // Fokus for sesongen (flere valg): styrer hvilke økttyper og hvilket innhold som vises. Tomt valg viser alt.
 const FOCUS={
-  slede:{label:"Hundekjøring med slede",dog:["Hundekjøring","Sykkeljøring","Vogn / ATV","Sparkesykkel","Gåtur","Kjettingtrekk"],race:true},
-  nordisk:{label:"Pulk og skijøring",dog:["Pulk","Skijøring","Canicross","Sykkeljøring","Gåtur","Kjettingtrekk"],race:true},
-  barmark:{label:"Canicross, sykkel og sparkesykkel",dog:["Canicross","Sykkeljøring","Sparkesykkel","Gåtur"],race:true},
+  slede:{label:"Hundekjøring med slede",dog:["Hundekjøring","Sykkelkjøring","Vogn / ATV","Sparkesykkel","Gåtur","Kjettingtrekk"],race:true},
+  nordisk:{label:"Pulk og skijøring",dog:["Pulk","Skijøring","Canicross","Sykkelkjøring","Gåtur","Kjettingtrekk"],race:true},
+  barmark:{label:"Canicross, sykkel og sparkesykkel",dog:["Canicross","Sykkelkjøring","Sparkesykkel","Gåtur"],race:true},
   tur:{label:"Turer og kløv",dog:["Gåtur","Kløvtur","Kløvtrening","Skijøring","Canicross"]},
   meg:{label:"Min egen form"},
 };
@@ -180,7 +180,8 @@ function demoClient(){
     auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@sagatrail.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res,signInWithPassword:async()=>({error:{message:"Demo: innlogging er slått av"}}),signUp:async()=>({error:{message:"Demo: registrering er slått av"}})}};
 }
 const sb=DEMO?demoClient():CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
-const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
+// Økter lagret med gammel skrivemåte («Sykkeljøring») vises med den nye
+const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type==="Sykkeljøring"?"Sykkelkjøring":r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
 const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false,pwMode:true,signup:false,invite:""};
@@ -816,6 +817,25 @@ function progressCard(t){
   const started=t>=ps;
   const before=sum(dogS().filter(s=>parse(s.dato)<ps),"km");
   const ahead=started&&gone>0?(fk-ft):0;
+  // Før planen starter: vis denne ukas kilometer mot første planuke, i stedet for 0 av hele planen
+  if(!started){
+    const wk=sum(dogS().filter(s=>iso(monday(parse(s.dato)))===iso(monday(t))),"km"),target=weekTotals(0).km||1,fw=Math.min(1,wk/target),days=Math.round((ps-t)/864e5);
+    return `<section class="prog" aria-label="Oppkjøring før planen starter">
+    <svg viewBox="0 0 132 132" width="132" height="132" role="img" aria-label="${Math.round(fw*100)} prosent av første planuke denne uka">
+      <circle cx="66" cy="66" r="${R1}" fill="none" stroke="var(--soft)" stroke-width="13"/>
+      <circle cx="66" cy="66" r="${R1}" fill="none" stroke="var(--accent)" stroke-width="13" stroke-linecap="round" stroke-dasharray="${(C1*fw).toFixed(1)} ${C1.toFixed(1)}" transform="rotate(-90 66 66)"/>
+      <text x="66" y="68" text-anchor="middle" style="font:700 26px 'Hanken Grotesk',sans-serif;fill:var(--ink)">${Math.round(fw*100)}%</text>
+      <text x="66" y="84" text-anchor="middle" style="font:500 10.5px 'Hanken Grotesk',sans-serif;fill:var(--muted)">av uke 1</text>
+    </svg>
+    <div>
+      <h3>${icon("flag","sm")} Oppkjøring</h3>
+      <div class="li"><span class="sw" style="background:var(--accent)"></span><span><span class="big">${fmtKm(wk)}</span> <span class="muted">km denne uka</span></span></div>
+      <div class="li"><span class="sw" style="background:var(--ink)"></span><span><span class="big">${days} ${days===1?"dag":"dager"}</span> <span class="muted">til planen starter</span></span></div>
+      <p class="small" style="margin-top:10px">Planen starter ${ps.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})}. Første uke er ${target} km.</p>
+      ${before?`<p class="small muted" style="margin-top:4px">${fmtKm(before)} km trent denne sesongen.</p>`:""}
+    </div>
+  </section>`;
+  }
   const status=!started?`Planen starter ${ps.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})}.`
     :ahead>=0.03?"Du ligger foran planen.":ahead<=-0.08?"Du ligger litt bak planen.":"Du ligger i rute.";
   return `<section class="prog" aria-label="Fremdrift mot løpet">
@@ -1584,7 +1604,7 @@ function openFileImport(src){
   draw();
 }
 /* Tractive-import: posisjonshistorikk (GPX/KML fra my.tractive.com) deles i turer, og brukeren velger hvilke som blir økter */
-const guessType=kmh=>kmh>=13?"Sykkeljøring":kmh>=7?"Canicross":"Gåtur";
+const guessType=kmh=>kmh>=13?"Sykkelkjøring":kmh>=7?"Canicross":"Gåtur";
 function openTractive(){
   const T={trips:null,err:"",dog:S.profile.dogs[0]||"",pick:{},types:{},gap:20,sel:null};
   const exists=t=>S.sessions.some(x=>x.dato===iso(t.start)&&Math.abs((Number(x.km)||0)-t.km)<=Math.max(0.3,t.km*0.08));
@@ -1632,7 +1652,7 @@ function openTractive(){
 function openForm(s,kat){
   editing=s||null;
   const last=dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0];
-  F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkeljøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:"",kategori:kat||"hund",rpe:null,kropp:null};
+  F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkelkjøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:"",kategori:kat||"hund",rpe:null,kropp:null};
   if(!s&&kat==="meg")F.type=(meS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Løping";
   F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);
   if(!s){const sea=seasonTypes(F.kategori);if(!sea.includes(F.type))F.type=sea[0]}
@@ -1684,7 +1704,7 @@ function draw(){
   gf.onchange=async()=>{const f=gf.files[0];if(!f)return;keep();try{await loadGpx(f);draw();toast("Turen er hentet fra fila")}catch(e){showErr("gpxErr",e)}};
   const gr=panel.querySelector("#gpxRemove");if(gr)gr.onclick=()=>{keep();F.rute=null;F.kilde="";draw()};
   panel.querySelector("#f-dato").onchange=()=>{keep();draw()};
-  panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");{const sea=seasonTypes(F.kategori);if(!sea.includes(F.type))F.type=sea[0]}draw()});
+  panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkelkjøring");{const sea=seasonTypes(F.kategori);if(!sea.includes(F.type))F.type=sea[0]}draw()});
   panel.querySelectorAll("[data-rpe]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.rpe);F.rpe=F.rpe===v?null:v;draw()});
   panel.querySelectorAll("[data-kropp]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.kropp);F.kropp=F.kropp===v?null:v;draw()});
   panel.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{keep();F.type=b.dataset.type;draw()});
