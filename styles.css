@@ -65,7 +65,8 @@ button{font:inherit;color:inherit}
 
 /* Hunder */
 .dogs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.dog{border:1.5px solid var(--line);border-radius:18px;padding:12px;background:var(--card)}
+.dog{border:1.5px solid var(--line);border-radius:18px;padding:12px;background:var(--card);width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.dogwarn{color:var(--bad);margin-top:6px;font-weight:600}
 .dog .name{font-family:"Barlow Condensed",sans-serif;font-size:1.25rem;font-weight:700}
 .dog .km{font-family:"Barlow Condensed",sans-serif;font-size:1.6rem;font-weight:600}
 .mood{display:flex;gap:3px;margin-top:6px}
@@ -141,6 +142,21 @@ body.anon main{padding-bottom:40px}
 .rules p{margin-top:12px}
 .calc{margin-top:14px;border:1.5px solid var(--accent);border-radius:18px;padding:14px 16px}
 .calc label{display:block;font-weight:600;margin-bottom:5px;font-size:.95rem}
+
+/* Hundeside */
+.warnbox{border:1.5px solid var(--bad);background:transparent}
+.warnbox ul{margin:6px 0 0;padding-left:20px}
+.okbox{border:1.5px solid var(--good);background:transparent}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px}
+.stats div{border:1.5px solid var(--line);border-radius:16px;padding:10px;text-align:center}
+.stats .cond{display:block;font-size:1.5rem;font-weight:700;line-height:1.1}
+.stats small{color:var(--muted)}
+.list{margin-top:12px}
+.lrow{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--line)}
+.lrow>span:first-child{flex:1}
+.btn.sm{padding:6px 12px;font-size:.88rem}
+.pill{border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:600;white-space:nowrap;background:var(--soft)}
+.pill.ok{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
 
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}

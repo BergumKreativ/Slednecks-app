@@ -103,13 +103,13 @@ const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.c
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||""});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
-const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
+const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="innst";
@@ -134,7 +134,7 @@ function render(){
   if(!sb)app.innerHTML=vSetup();
   else if(!S.authReady)app.innerHTML=`<p class="empty">Laster …</p>`;
   else if(!S.user)app.innerHTML=vLogin();
-  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings})[S.view]();
+  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings,hund:vDog})[S.view]();
   bind();
 }
 
@@ -223,14 +223,108 @@ function progressCard(t){
   </section>`;
 }
 
+/* Hundeprofiler. Lagres i profiles.dog_info, med hundens navn som nøkkel. */
+const VACCINES=[
+  {id:"DHP",name:"Valpesyke, parvo og hepatitt (DHP)",years:3},
+  {id:"KH",name:"Kennelhoste (Pi + Bordetella)",years:1},
+  {id:"Rabies",name:"Rabies",years:null},
+  {id:"Annet",name:"Annet",years:null},
+];
+const BCS=[[1,"avmagret"],[2,"svært tynn"],[3,"tynn"],[4,"ideell, slank"],[5,"ideell"],[6,"litt over"],[7,"tung"],[8,"fet"],[9,"svært fet"]];
+const vacName=id=>(VACCINES.find(v=>v.id===id)||{name:id}).name;
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const dogInfo=n=>(S.profile.dogInfo||{})[n]||{};
+const byDateDesc=a=>(a||[]).slice().sort((x,y)=>x.d<y.d?1:x.d>y.d?-1:0);
+const lastWeight=n=>byDateDesc(dogInfo(n).weights).find(w=>w.kg)||null;
+const addYears=(s,y)=>{const d=parse(s);d.setFullYear(d.getFullYear()+y);return iso(d)};
+function vaccineStatus(v){
+  if(!v.until)return{c:"",t:"Ingen utløpsdato"};
+  const days=Math.round((parse(v.until)-todayD())/864e5);
+  if(days<0)return{c:"bad",t:`Utløpt ${parse(v.until).toLocaleDateString("nb-NO")}`};
+  if(days<=60)return{c:"warn",t:`Går ut om ${days} ${days===1?"dag":"dager"}`};
+  return{c:"ok",t:`Gyldig til ${parse(v.until).toLocaleDateString("nb-NO")}`};
+}
+function ageMonths(born,at){const b=parse(born),a=at||todayD();let m=(a.getFullYear()-b.getFullYear())*12+a.getMonth()-b.getMonth();if(a.getDate()<b.getDate())m--;return m}
+const ageText=m=>m<24?`${m} mnd`:`${Math.floor(m/12)} år${m%12?` og ${m%12} mnd`:""}`;
+function dogWarnings(n){
+  const i=dogInfo(n), w=[], race=S.profile.raceDate;
+  if(!i.chip)w.push("Mangler chip-ID");
+  const latest=type=>byDateDesc((i.vaccines||[]).filter(v=>v.type===type))[0];
+  const dhp=latest("DHP"), kh=latest("KH");
+  if(!dhp)w.push("Mangler DHP-vaksine");
+  else{const st=vaccineStatus(dhp);if(st.c==="bad"||st.c==="warn")w.push(`DHP: ${st.t.toLowerCase()}`);else if(dhp.until&&dhp.until<race)w.push("DHP går ut før løpet")}
+  if(kh){const st=vaccineStatus(kh);if(st.c==="bad"||st.c==="warn")w.push(`Kennelhoste: ${st.t.toLowerCase()}`);else if(kh.until&&kh.until<race)w.push("Kennelhoste går ut før løpet")}
+  if(i.born){const m=ageMonths(i.born,parse(race));if(m<18)w.push(`Bare ${ageText(Math.max(0,m))} på løpsdagen (krav: 18 mnd)`)}
+  return w;
+}
+async function saveDogInfo(n,info){
+  const all={...(S.profile.dogInfo||{}),[n]:info};
+  ok(await sb.from("profiles").update({dog_info:all}).eq("user_id",S.user.id));
+  S.profile.dogInfo=all;
+}
+function weightChart(ws){
+  const pts=ws.filter(w=>w.kg).slice().reverse();
+  if(pts.length<2)return "";
+  const W=320,Hh=90,pad=22,min=Math.min(...pts.map(p=>p.kg))-1,max=Math.max(...pts.map(p=>p.kg))+1;
+  const t0=parse(pts[0].d),t1=parse(pts[pts.length-1].d),span=Math.max(1,t1-t0);
+  const xy=p=>[pad+(parse(p.d)-t0)/span*(W-2*pad),8+(Hh-30)*(1-(p.kg-min)/(max-min))];
+  const line=pts.map(p=>xy(p).map(v=>v.toFixed(1)).join(",")).join(" ");
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="Vekt over tid">
+    <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map(p=>{const [x,y]=xy(p);return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="var(--accent)"><title>${fmtD(parse(p.d))}: ${fmtKm(p.kg)} kg</title></circle>`}).join("")}
+    <text x="${pad}" y="${Hh-4}">${fmtD(t0)}</text><text x="${W-pad}" y="${Hh-4}" text-anchor="end">${fmtD(t1)}</text>
+    <text x="${W-pad}" y="12" text-anchor="end">${fmtKm(pts[pts.length-1].kg)} kg</text></svg></div>`;
+}
+function vDog(){
+  const n=S.dog, i=dogInfo(n), ws=byDateDesc(i.weights), vs=byDateDesc(i.vaccines), warn=dogWarnings(n);
+  const mine=S.sessions.filter(s=>(s.hunder||[]).includes(n)), lw=ws.find(w=>w.kg), lb=ws.find(w=>w.bcs);
+  const facts=[i.sex,i.breed,i.born?ageText(ageMonths(i.born)):""].filter(Boolean);
+  return `<div class="actions" style="margin-top:4px"><button class="btn ghost" id="dogBack">← Tilbake</button></div>
+  <h1 class="cond" style="font-size:2.6rem;margin-top:12px">${esc(n)}</h1>
+  <p class="muted">${facts.length?facts.map(esc).join(" · "):"Fyll inn info om hunden lenger ned."}</p>
+  ${warn.length?`<div class="notice warnbox"><b>Sjekk før løpet</b><ul>${warn.map(w=>`<li>${esc(w)}</li>`).join("")}</ul></div>`:`<p class="notice okbox">✓ Chip og vaksiner er i orden for løpet.</p>`}
+  <div class="stats"><div><span class="cond">${fmtKm(sum(mine,"km"))}</span><small>km totalt</small></div><div><span class="cond">${mine.length}</span><small>økter</small></div>
+   <div><span class="cond">${lw?fmtKm(lw.kg):"–"}</span><small>kg</small></div><div><span class="cond">${lb?lb.bcs:"–"}</span><small>BCS</small></div></div>
+
+  <h2>Vekt og hold</h2>
+  ${weightChart(ws)}
+  <div class="field"><label for="w-d">Dato</label><input id="w-d" type="date" value="${iso(todayD())}"></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="w-kg">Vekt (kg)</label><input id="w-kg" inputmode="decimal" placeholder="0"></div>
+   <div><label for="w-bcs">BCS</label><select id="w-bcs"><option value="">–</option>${BCS.map(([v,l])=>`<option value="${v}">${v} – ${l}</option>`).join("")}</select></div></div>
+  <div class="actions"><button class="btn" id="wAdd">Legg til måling</button></div>
+  <p class="small muted" style="margin-top:8px">BCS (body condition score) går fra 1 til 9, der 4–5 er ideelt. Du skal lett kunne kjenne ribbeina, og se en tydelig midje ovenfra.</p>
+  ${ws.length?`<div class="list">${ws.map(w=>`<div class="lrow"><span>${fmtD(parse(w.d))} ${parse(w.d).getFullYear()}</span><span>${w.kg?`<b>${fmtKm(w.kg)} kg</b>`:""}${w.bcs?` · BCS ${w.bcs}`:""}</span><button type="button" class="btn ghost sm" data-wdel="${esc(w.id)}" aria-label="Slett måling">Slett</button></div>`).join("")}</div>`:""}
+
+  <h2>Vaksinekort</h2>
+  ${vs.length?`<div class="list">${vs.map(v=>{const st=vaccineStatus(v);return `<div class="lrow"><span><b>${esc(vacName(v.type))}</b><br><span class="small muted">Gitt ${parse(v.d).toLocaleDateString("nb-NO")}${v.note?` · ${esc(v.note)}`:""}</span></span><span class="pill ${st.c}">${esc(st.t)}</span><button type="button" class="btn ghost sm" data-vdel="${esc(v.id)}" aria-label="Slett vaksine">Slett</button></div>`}).join("")}</div>`:`<p class="muted">Ingen vaksiner registrert.</p>`}
+  <div class="field"><label for="v-type">Vaksine</label><select id="v-type">${VACCINES.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join("")}</select></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="v-d">Dato gitt</label><input id="v-d" type="date" value="${iso(todayD())}"></div>
+   <div><label for="v-until">Gyldig til</label><input id="v-until" type="date" value="${addYears(iso(todayD()),3)}"></div></div>
+  <div class="field"><label for="v-note">Merknad</label><input id="v-note" maxlength="80" placeholder="Preparat, veterinær …"></div>
+  <div class="actions"><button class="btn" id="vAdd">Legg til vaksine</button></div>
+  <p class="small muted" style="margin-top:8px">NHF krever DHP (gyldig 3 år for hunder over 1 år) og anbefaler kennelhoste (1 år). Sjekk alltid gyldigheten i preparatomtalen, og husk karenstid før løp.</p>
+
+  <h2>ID og info</h2>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="i-born">Født</label><input id="i-born" type="date" value="${esc(i.born||"")}"></div>
+   <div><label for="i-sex">Kjønn</label><select id="i-sex">${["","Tispe","Hannhund"].map(x=>`<option ${i.sex===x?"selected":""} value="${x}">${x||"–"}</option>`).join("")}</select></div></div>
+  <div class="field"><label for="i-breed">Rase</label><input id="i-breed" value="${esc(i.breed||"")}" maxlength="40" placeholder="F.eks. alaskan husky"></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="i-chip">Chip-ID</label><input id="i-chip" inputmode="numeric" value="${esc(i.chip||"")}" maxlength="20" placeholder="15 siffer"></div>
+   <div><label for="i-chipd">Chip satt inn</label><input id="i-chipd" type="date" value="${esc(i.chipDate||"")}"></div></div>
+  <div class="field"><label for="i-harness">Sele og utstyr</label><input id="i-harness" value="${esc(i.harness||"")}" maxlength="80" placeholder="Selestørrelse, sokker, dekken …"></div>
+  <div class="field"><label for="i-notes">Notater</label><textarea id="i-notes" placeholder="Skader, poter, fôr, eier for lånehund …">${esc(i.notes||"")}</textarea></div>
+  <div class="actions"><button class="btn" id="iSave">Lagre info</button></div>
+  <p class="err" id="dogErr" hidden></p>`;
+}
 function dogCard(n){
   const mine=S.sessions.filter(s=>(s.hunder||[]).includes(n)).sort((a,b)=>a.dato<b.dato?1:-1);
   const wk=mine.filter(s=>parse(s.dato)>=monday(todayD()));
   const longest=mine.reduce((a,s)=>Math.max(a,Number(s.km)||0),0);
   const moods=mine.map(s=>s.motivasjon&&s.motivasjon[n]).filter(Boolean).slice(0,6).reverse();
-  return `<div class="dog"><div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
-    <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}</p>
-    ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}</div>`;
+  const warn=dogWarnings(n), lw=lastWeight(n);
+  return `<button type="button" class="dog" data-dogpage="${esc(n)}"><div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
+    <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}${lw?`<br>${fmtKm(lw.kg)} kg${lw.bcs?` · BCS ${lw.bcs}`:""}`:""}</p>
+    ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}
+    ${warn.length?`<p class="small dogwarn">⚠ ${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}</button>`;
 }
 
 function trail(bw,t){
@@ -317,7 +411,13 @@ function grenInfo(g){
   ${g.pulk?`<div class="calc"><h3>Pulkvekt</h3><p class="small muted">Pulken, med sele, drag og trekkreimer, skal veie minst hundenes vekt ganget med en faktor.</p>
    <div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><label for="pk-n">Antall hunder</label><select id="pk-n">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join("")}</select></div>
    <div><label for="pk-w">Hundenes vekt (kg)</label><input id="pk-w" inputmode="decimal" placeholder="Samlet vekt"></div></div>
+   ${pulkDogChips()}
    <p class="notice" id="pk-out" aria-live="polite">Fyll inn hva hunden veier.</p></div>`:""}`;
+}
+function pulkDogChips(){
+  const ds=S.profile.dogs.map(n=>[n,lastWeight(n)]).filter(([,w])=>w);
+  if(!ds.length)return `<p class="small muted" style="margin-top:8px">Tips: legg inn vekt på hundesiden, så kan du velge hundene her.</p>`;
+  return `<p class="small muted" style="margin-top:10px">Velg hundene som skal gå:</p><div class="chips" id="pk-dogs">${ds.map(([n,w])=>`<button type="button" class="chip" data-pkdog="${esc(n)}" data-kg="${w.kg}" aria-pressed="false">${esc(n)} · ${fmtKm(w.kg)} kg</button>`).join("")}</div>`;
 }
 function pulkText(n,w){
   const f=(window.PULK_FACTORS||{})[n];
@@ -326,7 +426,7 @@ function pulkText(n,w){
   const kg=n=>n.toLocaleString("nb-NO",{maximumFractionDigits:2});
   return `Pulken må veie minst <b>${kg(Math.ceil(w*f*100-1e-9)/100)} kg</b> (${kg(w)} kg × ${String(f).replace(".",",")}).`;
 }
-const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:center"><input class="dogin" data-orig="${esc(orig)}" value="${esc(name)}" maxlength="30" aria-label="Navn på hund" placeholder="Navn"><button type="button" class="btn ghost rmdog" aria-label="Fjern ${esc(name||"hund")}">Fjern</button></div>`;
+const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:center"><input class="dogin" data-orig="${esc(orig)}" value="${esc(name)}" maxlength="30" aria-label="Navn på hund" placeholder="Navn">${orig?`<button type="button" class="btn ghost" data-dogpage="${esc(orig)}">Info</button>`:""}<button type="button" class="btn ghost rmdog" aria-label="Fjern ${esc(name||"hund")}">Fjern</button></div>`;
 function vSettings(){
   const p=S.profile;
   return `${S.isNew?`<p class="notice" style="margin-top:6px"><b>Velkommen!</b> Sett opp løpet du trener mot og hundene dine, så lages en plan for deg.</p>`:""}
@@ -438,6 +538,30 @@ function errText(e){
 function showErr(id,e){const el=document.getElementById(id);if(!el)return;el.textContent=errText(e);el.hidden=false}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove("show"),1800)}
 
+function bindDog(){
+  const n=S.dog, $=id=>document.getElementById(id);
+  const save=async(info,msg)=>{try{await saveDogInfo(n,info);render();toast(msg)}catch(e){showErr("dogErr",e)}};
+  $("dogBack").onclick=()=>{S.view="hjem";render();window.scrollTo(0,0)};
+  $("wAdd").onclick=()=>{
+    const kg=num($("w-kg").value), bcs=Number($("w-bcs").value)||0;
+    if(!kg&&!bcs)return showErr("dogErr",{message:"Skriv inn vekt eller velg BCS."});
+    const i=dogInfo(n);save({...i,weights:[...(i.weights||[]),{id:newId(),d:$("w-d").value||iso(todayD()),kg:kg||null,bcs:bcs||null}]},"Målingen er lagret");
+  };
+  document.querySelectorAll("[data-wdel]").forEach(b=>b.onclick=()=>{if(!confirm("Slette denne målingen?"))return;const i=dogInfo(n);save({...i,weights:(i.weights||[]).filter(w=>w.id!==b.dataset.wdel)},"Målingen er slettet")});
+  const upd=()=>{const v=VACCINES.find(x=>x.id===$("v-type").value);$("v-until").value=v&&v.years&&$("v-d").value?addYears($("v-d").value,v.years):""};
+  $("v-type").onchange=upd;$("v-d").onchange=upd;
+  $("vAdd").onclick=()=>{
+    if(!$("v-d").value)return showErr("dogErr",{message:"Velg datoen vaksinen ble gitt."});
+    const i=dogInfo(n);save({...i,vaccines:[...(i.vaccines||[]),{id:newId(),type:$("v-type").value,d:$("v-d").value,until:$("v-until").value||"",note:$("v-note").value.trim()}]},"Vaksinen er lagret");
+  };
+  document.querySelectorAll("[data-vdel]").forEach(b=>b.onclick=()=>{if(!confirm("Slette denne vaksinen?"))return;const i=dogInfo(n);save({...i,vaccines:(i.vaccines||[]).filter(v=>v.id!==b.dataset.vdel)},"Vaksinen er slettet")});
+  $("iSave").onclick=()=>{
+    const chip=$("i-chip").value.replace(/\s/g,"");
+    if(chip&&!/^\d{9,15}$/.test(chip))return showErr("dogErr",{message:"Chip-ID skal være 9–15 siffer (vanligvis 15)."});
+    save({...dogInfo(n),born:$("i-born").value,sex:$("i-sex").value,breed:$("i-breed").value.trim(),chip,chipDate:$("i-chipd").value,harness:$("i-harness").value.trim(),notes:$("i-notes").value.trim()},"Infoen er lagret");
+  };
+}
+
 /* Backup */
 function exportData(){
   const data={app:"slednecks",versjon:1,eksportert:new Date().toISOString(),profil:S.profile,okter:S.sessions.map(toRow)};
@@ -459,6 +583,8 @@ async function importData(file){
 }
 
 function bind(){
+  document.querySelectorAll("[data-dogpage]").forEach(b=>b.onclick=()=>{S.dog=b.dataset.dogpage;S.view="hund";render();window.scrollTo(0,0)});
+  if(S.view==="hund"&&S.user)bindDog();
   const send=document.getElementById("l-send");
   if(send)send.onclick=async()=>{
     const email=document.getElementById("l-email").value.trim();
@@ -483,9 +609,10 @@ function bind(){
       raceId:pick?pick+(cls&&cls.value?"|"+cls.value:""):"",raceType:document.getElementById("g-gren").value+(document.getElementById("g-class").value?"|"+document.getElementById("g-class").value:""),planType:document.getElementById("r-plan").value,dogs};
     ss.disabled=true;
     try{
-      ok(await sb.from("profiles").upsert({user_id:S.user.id,...profileRow(prof),updated_at:new Date().toISOString()}));
-      S.isNew=false;
       const ren={};rows.forEach(r=>{if(r.orig&&r.orig!==r.name)ren[r.orig]=r.name});
+      const info={...(S.profile.dogInfo||{})};for(const [o,nw] of Object.entries(ren))if(info[o]){info[nw]=info[o];delete info[o]}
+      ok(await sb.from("profiles").upsert({user_id:S.user.id,...profileRow(prof),dog_info:info,updated_at:new Date().toISOString()}));
+      S.isNew=false;
       if(Object.keys(ren).length)for(const s of S.sessions.filter(s=>(s.hunder||[]).some(h=>h in ren))){
         const mot={};for(const [k,v] of Object.entries(s.motivasjon||{}))mot[ren[k]||k]=v;
         ok(await sb.from("okter").update({hunder:s.hunder.map(h=>ren[h]||h),motivasjon:mot}).eq("id",s.id));
@@ -501,7 +628,15 @@ function bind(){
     const gc=document.getElementById("g-class"), g=GREN(gs.value);
     gc.onchange=()=>{const c=g.classes.find(x=>x.name===gc.value);if(c&&!document.getElementById("r-pick").value)document.getElementById("r-km").value=fmtKm(c.km[1])};
     const n=document.getElementById("pk-n"), w=document.getElementById("pk-w"), out=document.getElementById("pk-out");
-    if(n){const upd=()=>{out.innerHTML=pulkText(Number(n.value),num(w.value))};n.onchange=upd;w.oninput=upd}
+    if(n){
+      const upd=()=>{out.innerHTML=pulkText(Number(n.value),num(w.value))};n.onchange=upd;w.oninput=upd;
+      document.querySelectorAll("[data-pkdog]").forEach(b=>b.onclick=()=>{
+        b.setAttribute("aria-pressed",b.getAttribute("aria-pressed")==="true"?"false":"true");
+        const on=[...document.querySelectorAll('[data-pkdog][aria-pressed="true"]')];
+        if(on.length){n.value=String(Math.min(5,on.length));w.value=fmtKm(on.reduce((a,x)=>a+Number(x.dataset.kg),0))}
+        upd();
+      });
+    }
   };
   function setGren(id){
     const g=GREN(id);if(!g||!gs)return;

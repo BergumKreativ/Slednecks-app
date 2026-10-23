@@ -17,6 +17,8 @@ alter table public.profiles add column if not exists race_id     text  not null 
 alter table public.profiles add column if not exists race_type   text  not null default 'Slede';
 alter table public.profiles add column if not exists plan_type   text  not null default '';
 alter table public.profiles add column if not exists plan_custom jsonb not null default '{}'::jsonb;
+-- Hundeprofiler: { "<navn>": { born, sex, breed, chip, chipDate, harness, notes, weights:[{d,kg,bcs}], vaccines:[{type,d,until,note}] } }
+alter table public.profiles add column if not exists dog_info jsonb not null default '{}'::jsonb;
 
 create table if not exists public.okter (
   id         uuid primary key default gen_random_uuid(),
