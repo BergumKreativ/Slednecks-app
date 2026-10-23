@@ -619,15 +619,9 @@ function wxSym(code){
 }
 // Været øverst på Oversikt: nå, resten av dagen og de neste timene
 function wxTop(){
-  if(!savedPos()){
-    const ios=/iPhone|iPad/.test(navigator.userAgent);
-    if(W.err==="denied")return `<div class="wxtop"><p class="small"><b>${icon("cloud-sun","sm")} Posisjon er slått av</b></p>
-      <p class="small" style="margin-top:6px">${ios?"På iPhone: Innstillinger → Personvern og sikkerhet → Stedstjenester → slå på, og velg «Ved bruk av appen» for Safari-nettsteder. I Safari: trykk aA i adressefeltet → Nettstedsinnstillinger → Plassering → Tillat.":"Trykk på hengelåsen eller innstillingsikonet ved adressefeltet, og tillat posisjon for nettstedet. Sjekk også at posisjon er slått på i telefonens innstillinger."}</p>
-      <div class="actions" style="margin-top:8px"><button class="btn line sm" id="wxPos">Prøv igjen</button></div></div>`;
-    return `<div class="wxtop"><p class="small"><b>${icon("cloud-sun","sm")} Se været der du er</b></p>
-     <p class="small" style="margin-top:4px">Slå på posisjon, så viser appen temperatur, vind og værmelding der du er hver gang du åpner den. Posisjonen brukes bare til vær og kart, og lagres bare på telefonen din.</p>
-     <div class="actions" style="margin-top:8px"><button class="btn sm" id="wxPos">Slå på posisjon</button></div></div>`;
-  }
+  if(!savedPos())return `<div class="wxtop"><p class="small"><b>${icon("cloud-sun","sm")} Hvor vil du se været?</b></p>
+     <p class="small" style="margin-top:4px">Skriv inn stedet ditt, for eksempel der du bor eller trener. Da vises temperatur, vind og værmelding hver gang du åpner appen.</p>
+     <div class="actions" style="margin-top:8px;flex-wrap:wrap"><button class="btn sm" data-place>Skriv inn sted</button>${W.err==="denied"?"":`<button class="btn line sm" id="wxPos">Bruk posisjonen min</button>`}</div></div>`;
   if(!W.data)return `<div class="wxtop"><p class="small muted center">${W.err?"Fikk ikke hentet været.":"Henter været …"}</p>${W.err?`<div class="actions" style="margin-top:6px"><button class="btn ghost sm" id="wxRetry">Prøv igjen</button></div>`:""}</div>`;
   const now=wxNow(),[ic,txt]=wxSym(now.sym),end=new Date();end.setHours(23,59,59,999);
   const today=W.data.filter(x=>x.t<=end),lo=Math.min(...today.map(x=>x.temp)),hi=Math.max(...today.map(x=>x.temp));
@@ -639,7 +633,36 @@ function wxTop(){
     <span class="wxtxt"><b>${esc(txt||"Været nå")}</b><br><span class="small muted">${W.place?esc(W.place)+" · ":""}i dag ${Math.round(lo)}° til ${Math.round(hi)}°</span></span></div>
    <div class="wxfacts small"><span>${icon("wind","sm")} ${fmtKm(now.wind)} m/s</span><span>${icon("droplets","sm")} ${Math.round(now.rh)} % fuktighet</span><span>${icon("cloud-rain","sm")} ${rainToday?fmtKm(rainToday)+" mm i dag":"Opphold i dag"}</span></div>
    <div class="wxhours">${hours.map(x=>`<span><small>${hh(x.t)}</small>${icon(wxSym(x.sym)[0],"sm")}<b>${Math.round(x.temp)}°</b></span>`).join("")}</div>
-   <p class="small muted" style="margin:6px 0 0;font-size:.72rem">Data fra MET Norway</p></div>`;
+   <p class="small muted" style="margin:6px 0 0;font-size:.72rem">Data fra MET Norway · <button type="button" class="linkbtn" data-place style="font-size:inherit">Endre sted</button></p></div>`;
+}
+// Velg sted for været uten stedstjenester: søk i Kartverkets stedsnavn, eller bruk posisjonen
+const PLACE_RANK=["By","Tettsted","Kommune","Bygd","Grend","Tettbebyggelse","Fjell","Fjellområde","Dal","Turisthytte"];
+function openPlace(after){
+  let timer=null,res=[];
+  const draw=()=>{panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Sted for været</h2><button class="btn ghost" id="plClose">Lukk</button></div>
+   <p class="small muted" style="margin:6px 0 10px">Skriv inn et sted i Norge, for eksempel byen, bygda eller fjellet du trener på.</p>
+   <div class="field"><input id="plQ" placeholder="F.eks. Lillehammer" autocomplete="off" enterkeyhint="search"></div>
+   <div class="list" id="plRes"></div>
+   ${navigator.geolocation&&W.err!=="denied"?`<p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="plGps">Bruk posisjonen min i stedet</button></p>`:""}`;
+   panel.querySelector("#plClose").onclick=closeForm;
+   const g=panel.querySelector("#plGps");if(g)g.onclick=()=>{closeForm();askPos()};
+   const q=panel.querySelector("#plQ");q.focus();q.oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>search(q.value.trim()),300)};
+  };
+  const list=()=>{const el=panel.querySelector("#plRes");if(!el)return;
+    el.innerHTML=res.map((r,i)=>`<button type="button" class="lrow src" data-pl="${i}"><span>${icon("map","sm")}</span><span><b>${esc(r.name)}</b><br><span class="small muted">${esc(r.type)}${r.kommune&&r.kommune!==r.name?` · ${esc(r.kommune)}`:""}</span></span></button>`).join("");
+    el.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>{const r=res[b.dataset.pl];
+      try{localStorage.setItem("sn-pos",JSON.stringify({lat:r.lat,lon:r.lon,manual:true}));localStorage.setItem("sn-place",JSON.stringify({lat:r.lat,lon:r.lon,name:r.name}))}catch(e){}
+      W.place=r.name;W.err="";W.data=null;closeForm();loadWeather(true);render();toast(`Været vises for ${r.name}`);if(after)after()})};
+  async function search(t){
+    if(t.length<2){res=[];return list()}
+    try{const r=await fetch(`https://api.kartverket.no/stedsnavn/v1/sted?sok=${encodeURIComponent(t)}*&fuzzy=false&utkoordsys=4258&treffPerSide=25&side=1`);const d=await r.json();
+      const rank=x=>{const i=PLACE_RANK.indexOf(x);return i<0?99:i};
+      res=(d.navn||[]).filter(n=>n.representasjonspunkt).map(n=>({name:n.stedsnavn[0].skrivemåte,type:n.navneobjekttype,kommune:(n.kommuner||[{}])[0].kommunenavn||"",lat:n.representasjonspunkt.nord,lon:n.representasjonspunkt["øst"]}))
+        .sort((a,b)=>rank(a.type)-rank(b.type)).slice(0,8);
+    }catch(e){res=[]}
+    list();
+  }
+  sheet.classList.add("open");draw();
 }
 function askPos(){
   if(!navigator.geolocation){W.err="denied";render();return}
@@ -863,8 +886,8 @@ function openSetup(start=0){
       <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="su-gtype">Type</label><select id="su-gtype">${MY_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div><div><label for="su-gdate">Når</label><input id="su-gdate" type="date"></div></div>`,
     import:()=>`<h2 id="formTitle">Har du trent allerede denne sesongen?</h2><p class="small muted">Hent inn øktene fra Strava, klokka eller Tractive, så er loggen og planen oppdatert fra start. ${S.sessions.length?`Du har ${S.sessions.length} økter i loggen nå.`:""}</p>
       <div class="actions" style="margin-top:12px"><button type="button" class="btn line" id="su-import">Importer økter</button></div>`,
-    vaer:()=>`<h2 id="formTitle">Vil du se været der du er?</h2><p class="small muted">Appen viser temperatur, vind og værmelding hver gang du åpner den, og velger vinter- eller barmarksmodus etter været. Posisjonen lagres bare på telefonen din.</p>
-      <div class="actions" style="margin-top:12px">${savedPos()?`<p class="small"><b>✓ Posisjon er slått på</b></p>`:`<button type="button" class="btn line" id="su-pos">Slå på posisjon</button>`}</div>`,
+    vaer:()=>`<h2 id="formTitle">Hvor vil du se været?</h2><p class="small muted">Appen viser temperatur, vind og værmelding hver gang du åpner den, og velger vinter- eller barmarksmodus etter været. Skriv inn stedet ditt, eller bruk posisjonen. Stedet lagres bare på telefonen din.</p>
+      <div class="actions" style="margin-top:12px;flex-wrap:wrap">${savedPos()?`<p class="small"><b>✓ Været vises for ${esc(W.place||"stedet ditt")}</b></p>`:`<button type="button" class="btn line" id="su-place">Skriv inn sted</button>${W.err==="denied"?"":`<button type="button" class="btn ghost" id="su-pos">Bruk posisjonen min</button>`}`}</div>`,
     ferdig:()=>`<h2 id="formTitle">Alt klart!</h2><p>Appen er tilpasset deg. Du kan endre alt under Profil, og kjøre disse spørsmålene igjen der.</p>
       <p class="small muted">Tips: Legg appen på hjem-skjermen. ${/iPhone|iPad/.test(navigator.userAgent)?"I Safari: trykk Del-knappen og «Legg til på Hjem-skjerm».":"I Chrome: trykk ⋮ og «Legg til på startskjermen»."}</p>`,
   };
@@ -883,6 +906,7 @@ function openSetup(start=0){
       $("x-pick").onchange=()=>{const r=raceById($("x-pick").value);$("x-classWrap").innerHTML=classSelect($("x-pick").value,"x-class");if(r){$("x-name").value=r.name;$("x-date").value=r.date;const c=$("x-class");if(c){c.onchange=fillClass;if(r.classes.length===1){c.value=r.classes[0].name;fillClass()}}}}}
     if(k==="import")$("su-import").onclick=()=>{Q.i++;openImport()};
     if(k==="vaer"&&$("su-pos"))$("su-pos").onclick=()=>{askPos();setTimeout(draw,1500)};
+    if(k==="vaer"&&$("su-place"))$("su-place").onclick=()=>openPlace(()=>openSetup(Q.i));
     $("suNext").onclick=async()=>{
       if(last){closeForm();S.isNew=false;S.view="hjem";render();window.scrollTo(0,0);return}
       $("suNext").disabled=true;
@@ -1807,13 +1831,14 @@ function bind(){
   const wr=document.getElementById("wxRetry");if(wr)wr.onclick=()=>{W.err="";loadWeather(true);render()};
   if(S.user&&S.view==="hjem"){
     // Har brukeren allerede gitt tillatelse, hentes posisjonen stille (også på en ny telefon). Ellers venter vi på knappen.
-    if(!W.asked&&navigator.permissions){W.asked=true;navigator.permissions.query({name:"geolocation"}).then(p=>{if(p.state==="granted")askPos();else if(p.state==="denied"&&!savedPos()){W.err="denied";render()}}).catch(()=>{})}
+    if(!W.asked&&navigator.permissions){W.asked=true;navigator.permissions.query({name:"geolocation"}).then(p=>{if(p.state==="granted"&&!(savedPos()||{}).manual)askPos();else if(p.state==="denied"&&!savedPos()){W.err="denied";render()}}).catch(()=>{})}
     loadWeather();
   }
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
   document.querySelectorAll("[data-tlmain]").forEach(b=>b.onclick=async()=>{const r=(S.profile.races||[]).find(x=>x.id===b.dataset.tlmain);if(!r||!confirm(`Gjøre ${r.name} til hovedløp? Treningsplanen bygges da mot dette løpet.`))return;try{await makeMainRace(r.id)}catch(e){toast(errText(e))}});
+  document.querySelectorAll("[data-place]").forEach(b=>b.onclick=()=>openPlace());
   ["setupOpen"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=()=>openSetup()});
   ["ciOpen","ciOpen2"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openCheckin});
   document.querySelectorAll("[data-focus]").forEach(b=>b.onclick=()=>toggleFocus(b.dataset.focus));
