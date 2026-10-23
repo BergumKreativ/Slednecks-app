@@ -354,3 +354,22 @@ h2{font-size:1.4rem}
 .chip,.flabel,.field label{font-weight:600}
 .muted,.small{font-weight:420}
 b,strong{font-weight:700}
+
+/* Tekst er alltid sort (hvit i mørk modus). Rødt brukes bare i gradienten, knapper og grafikk.
+   Varsler får et lite farget merke foran teksten i stedet for farget tekst. */
+.badge-ok,.hit{color:var(--ink)}
+.pday.own .pt::before,.pday.done .pt::after{color:var(--ink)}
+.pill.ok,.pill.warn,.pill.bad{color:var(--ink)}
+.pill.ok::before,.pill.warn::before,.pill.bad::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.pill.ok::before{background:var(--good)}.pill.warn::before{background:var(--warn)}.pill.bad::before{background:var(--bad)}
+.err,.dogwarn,.warntext{color:var(--ink)}
+.err::before,.dogwarn::before,.warntext::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--bad)}
+.warntext::before{background:var(--warn)}
+.btn.del{color:var(--ink);border-color:var(--line)}
+.moodrow button[aria-pressed="true"]{border-color:var(--ink);background:var(--soft)}
+.pweek.badge{border-color:var(--ink)}
+.login .brand span,.welcome .brand span{color:inherit}
+a{color:inherit}
+body.anon .login .err::before{background:#fff}
+.warnbox{border-color:var(--ink)}
+.warnbox>b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--bad)}

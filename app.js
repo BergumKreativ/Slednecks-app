@@ -505,7 +505,7 @@ const meLoad=()=>loadStatus(meS(),s=>(Number(s.min)||0)*(Number(s.rpe)||5),"norm
 function loadBox(L,unit){
   if(!L.t)return "";
   const max=Math.max(L.acute,L.chronic,1);
-  return `<div class="load"><p class="small ${L.lvl===2?"err":L.lvl===1?"warntext":"muted"}">${L.lvl?"⚠ ":""}${esc(L.t)}</p>
+  return `<div class="load"><p class="small ${L.lvl===2?"err":L.lvl===1?"warntext":"muted"}">${esc(L.t)}</p>
    ${L.ratio!=null?`<div class="lbar"><span>Siste 7 dager</span><div class="bar"><span class="${L.lvl===2?"hi":L.lvl===1?"mid":""}" style="width:${L.acute/max*100}%"></span></div><b>${unit(L.acute)}</b></div>
    <div class="lbar"><span>Vanlig uke</span><div class="bar"><span class="base" style="width:${L.chronic/max*100}%"></span></div><b>${unit(L.chronic)}</b></div>`:""}</div>`;
 }
@@ -826,8 +826,8 @@ function dogCard(n){
   return `<button type="button" class="dog" data-dogpage="${esc(n)}">${dogInfo(n).photo?imgTag(dogInfo(n).photo,"avatar",n):""}<div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
     <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}${lw?`<br>${fmtKm(lw.kg)} kg${lw.bcs?` · BCS ${lw.bcs}`:""}`:""}</p>
     ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}
-    ${warn.length?`<p class="small dogwarn">⚠ ${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}
-    ${(L=>L.lvl?`<p class="small ${L.lvl===2?"dogwarn":"warntext"}">📈 ${L.lvl===2?"Kraftig økning":"Økt belastning"} siste uke</p>`:"")(dogLoad(n))}</button>`;
+    ${warn.length?`<p class="small dogwarn">${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}
+    ${(L=>L.lvl?`<p class="small ${L.lvl===2?"dogwarn":"warntext"}">${L.lvl===2?"Kraftig økning":"Økt belastning"} siste uke</p>`:"")(dogLoad(n))}</button>`;
 }
 
 function trail(bw,t){
@@ -1035,7 +1035,7 @@ function draw(){
    <div><label for="f-min">Minutter</label><input id="f-min" inputmode="numeric" value="${esc(F.min)}" placeholder="0"></div></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="f-temp">Temperatur (°C)</label><input id="f-temp" inputmode="decimal" value="${esc(F.temp??"")}" placeholder="–"></div>
    <div><label for="f-rh">Luftfuktighet (%)</label><input id="f-rh" inputmode="numeric" value="${esc(F.rh??"")}" placeholder="–"></div></div>
-  ${F.temp!==""&&F.temp!=null&&!me&&heatRisk(num(F.temp),num(F.rh)).lvl>=2?`<p class="small err" style="margin-top:6px">⚠ ${RISK[heatRisk(num(F.temp),num(F.rh)).lvl].t} for hundene ved denne temperaturen.</p>`:""}
+  ${F.temp!==""&&F.temp!=null&&!me&&heatRisk(num(F.temp),num(F.rh)).lvl>=2?`<p class="small err" style="margin-top:6px">${RISK[heatRisk(num(F.temp),num(F.rh)).lvl].t} for hundene ved denne temperaturen.</p>`:""}
   ${me||LOAD_LABEL[F.type]?`<div class="field"><label for="f-kg">${me?"Sekk (kg)":LOAD_LABEL[F.type]}</label><input id="f-kg" inputmode="decimal" value="${esc(F.last_kg??"")}" placeholder="${me?"Ingen sekk":"0"}"></div>`:""}
   ${me?`<div class="field"><span class="flabel">Hvor hardt var det? <span class="muted" style="font-weight:400">(1 = veldig lett, 10 = maks)</span></span><div class="chips rpe">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<button type="button" class="chip" data-rpe="${v}" aria-pressed="${F.rpe===v}">${v}</button>`).join("")}</div></div>
   <div class="field"><span class="flabel">Hvordan kjentes kroppen?</span><div class="chips">${KROPP.map(([v,l])=>`<button type="button" class="chip" data-kropp="${v}" aria-pressed="${F.kropp===v}">${l}</button>`).join("")}</div></div>`:`<div class="field"><span class="flabel">Hunder med</span><div class="chips">${dogs.map(d=>`<button type="button" class="chip" data-dog="${esc(d)}" aria-pressed="${F.hunder.includes(d)}">${esc(d)}</button>`).join("")}</div></div>`}
