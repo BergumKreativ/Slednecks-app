@@ -115,7 +115,16 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
 const APP_NAME=window.APP_NAME||"Spåtind"; // Arbeidsnavn – endres ett sted i index.html
-const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
+// Demomodus (window.APP_DEMO): viser appen med eksempeldata uten innlogging. Ingenting lagres.
+const DEMO=window.APP_DEMO===true;
+function demoClient(){
+  const res={data:null,error:null};
+  const chain=()=>new Proxy(()=>{},{get:(t,k)=>k==="then"?(f,r)=>Promise.resolve(res).then(f,r):()=>chain(),apply:()=>chain()});
+  return{from:()=>chain(),rpc:()=>chain(),
+    storage:{from:()=>({upload:async()=>res,remove:async()=>res,createSignedUrls:async()=>({data:[],error:null})})},
+    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",{user:{id:"demo",email:"demo@spatind.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
+}
+const sb=DEMO?demoClient():CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
@@ -123,6 +132,10 @@ const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),r
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
+  if(DEMO){
+    if(!S.loaded){const D=window.DEMO_DATA||{};S.profile={...S.profile,...D.profile};S.sessions=(D.sessions||[]).map(rowToSession);REP.list=D.reports||[];REP.at=Date.now()}
+    S.loaded=true;render();return;
+  }
   const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,lisens,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
   if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
@@ -596,8 +609,8 @@ function progressCard(t){
       <circle cx="66" cy="66" r="${R1}" fill="none" stroke="var(--accent)" stroke-width="13" stroke-linecap="round" stroke-dasharray="${(C1*fk).toFixed(1)} ${C1.toFixed(1)}" transform="rotate(-90 66 66)"/>
       <circle cx="66" cy="66" r="${R2}" fill="none" stroke="var(--soft)" stroke-width="8"/>
       <circle cx="66" cy="66" r="${R2}" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(C2*ft).toFixed(1)} ${C2.toFixed(1)}" transform="rotate(-90 66 66)"/>
-      <text x="66" y="68" text-anchor="middle" style="font:700 26px 'Barlow Condensed',sans-serif;fill:var(--ink)">${Math.round(fk*100)}%</text>
-      <text x="66" y="84" text-anchor="middle" style="font:500 10.5px 'Barlow',sans-serif;fill:var(--muted)">av planen</text>
+      <text x="66" y="68" text-anchor="middle" style="font:700 26px 'Hanken Grotesk',sans-serif;fill:var(--ink)">${Math.round(fk*100)}%</text>
+      <text x="66" y="84" text-anchor="middle" style="font:500 10.5px 'Hanken Grotesk',sans-serif;fill:var(--muted)">av planen</text>
     </svg>
     <div>
       <h3>${icon("flag","sm")} Mot målet</h3>
@@ -823,7 +836,7 @@ function trail(bw,t){
   for(let i=0;i<n;i++){const y=i%2?38:30,xi=x(i),pk=weekTotals(i).km,f=Math.min(1,sum(bw[iso(addDays(start,i*7))]||[],"km")/pk),r=i===n-1?11:8,now=i===nowW;
     path+=(i?" L":"M")+xi.toFixed(1)+" "+y;
     dots+=`<circle cx="${xi}" cy="${y}" r="${r}" fill="var(--bg)" stroke="var(--ink)" stroke-width="${now?3:1.5}"/>`+(f>0?`<circle cx="${xi}" cy="${y}" r="${(r-2.5)*Math.sqrt(f)}" fill="var(--accent)"/>`:"");
-    if(i===n-1)dots+=`<text x="${xi}" y="${y+4}" text-anchor="middle" style="font:700 10px 'Barlow Condensed',sans-serif;fill:var(--ink)">${fmtKm(S.profile.raceKm)}</text>`;
+    if(i===n-1)dots+=`<text x="${xi}" y="${y+4}" text-anchor="middle" style="font:700 10px 'Hanken Grotesk',sans-serif;fill:var(--ink)">${fmtKm(S.profile.raceKm)}</text>`;
     lbl+=`<text class="lbl${now?" now":""}" x="${xi}" y="${h-4}" text-anchor="middle">${i===n-1?"Løpet":"u"+isoWeek(addDays(start,i*7))}</text>`}
   return `<div class="trail" aria-label="Løypa frem mot løpet: hver prikk er en uke, fylt etter hvor mye av ukemålet som er gjort"><svg viewBox="0 0 ${W} ${h}" width="${W}" height="${h}"><path d="${path}" fill="none" stroke="var(--line)" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>${dots}${lbl}</svg></div>`;
 }
