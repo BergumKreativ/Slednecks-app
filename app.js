@@ -695,6 +695,8 @@ function activityFromLog(n){
   return {km,id:km<1?"lite":km<3?"normal":km<8?"aktiv":km<18?"hard":"ekstrem"};
 }
 const feedById=id=>(window.FEEDS||[]).find(f=>f.id===id);
+const feedMix=i=>Array.isArray(i.mix)?i.mix:i.feed2Id?[{id:i.feed2Id,share:i.feed2Share}]:[];
+const mixRow=(id,share)=>`<div class="field mixrow grid3" style="grid-template-columns:2fr 1fr auto;align-items:end"><div><label>Tillegg</label><select class="mx-id"><option value="">Velg</option>${feedOptions(id).replace(/<option value="">Velg fôr<\/option>/,"").replace(/<option value="custom"[^>]*>[^<]*<\/option>/,"")}</select></div><div><label>Andel %</label><input class="mx-share" inputmode="numeric" value="${esc(share??"")}" placeholder="20"></div><button type="button" class="btn ghost sm rmmix" aria-label="Fjern tillegg">×</button></div>`;
 function feedNeed(n){
   const i=dogInfo(n), lw=lastWeight(n);
   if(!lw)return null;
@@ -702,28 +704,42 @@ function feedNeed(n){
   const factor=i.neutered&&a.fn?a.fn:a.f, rer=70*Math.pow(lw.kg,0.75), lb=byDateDesc(i.weights).find(w=>w.bcs);
   const adj=lb&&lb.bcs>=6?0.9:lb&&lb.bcs<=3?1.1:1;
   const kcal=rer*factor*adj, fd=i.feedId==="custom"?{name:i.feedName||"Eget fôr",kcal100:Number(i.feedKcal)||0}:feedById(i.feedId);
-  return {kg:lw.kg,rer,factor,adj,kcal,bcs:lb&&lb.bcs,feed:fd,grams:fd&&fd.kcal100?kcal/fd.kcal100*100:null};
+  // Tillegg (f.eks. VOM, rent kjøtt, fett), hvert med andel av dagens energi. Resten kommer fra hovedfôret.
+  const adds=feedMix(i).map(m=>({feed:feedById(m.id),share:Math.max(0,Number(m.share)||0)/100})).filter(m=>m.feed&&m.share);
+  const sum=adds.reduce((a,m)=>a+m.share,0), scale=sum>0.9?0.9/sum:1;
+  adds.forEach(m=>{m.share*=scale;m.grams=kcal*m.share/m.feed.kcal100*100});
+  const rest=1-adds.reduce((a,m)=>a+m.share,0);
+  return {kg:lw.kg,rer,factor,adj,kcal,bcs:lb&&lb.bcs,feed:fd,adds,rest,water:Number(i.water)||0,
+    grams:fd&&fd.kcal100?kcal*rest/fd.kcal100*100:null};
 }
 function feedOptions(sel){
   const groups={};for(const f of window.FEEDS||[])(groups[f.brand]=groups[f.brand]||[]).push(f);
-  return `<option value="">Velg fôr</option>`+Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0],"nb")).map(([b,fs])=>`<optgroup label="${esc(b)}">${fs.map(f=>`<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.product)} · ${f.kcal100} kcal/100 g</option>`).join("")}</optgroup>`).join("")+`<option value="custom" ${sel==="custom"?"selected":""}>Annet fôr – skriv inn selv</option>`;
+  return `<option value="">Velg fôr</option>`+Object.entries(groups).sort((a,b)=>(a[0].startsWith("Rent kjøtt")-b[0].startsWith("Rent kjøtt"))||a[0].localeCompare(b[0],"nb")).map(([b,fs])=>`<optgroup label="${esc(b)}">${fs.map(f=>`<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.product)} · ${f.kcal100} kcal/100 g</option>`).join("")}</optgroup>`).join("")+`<option value="custom" ${sel==="custom"?"selected":""}>Annet fôr – skriv inn selv</option>`;
 }
 function feedSection(n){
   const i=dogInfo(n), need=feedNeed(n), log=activityFromLog(n), r10=v=>Math.round(v/10)*10;
   const fd=i.feedId&&i.feedId!=="custom"?feedById(i.feedId):null;
   return `<h2>Fôring</h2>
-  ${need?`<div class="feedres"><div class="stats" style="grid-template-columns:repeat(${need.grams?2:1},1fr)"><div><span class="cond">${Math.round(need.kcal/10)*10}</span><small>kcal per dag</small></div>${need.grams?`<div><span class="cond">${r10(need.grams)} g</span><small>${esc(need.feed.name||need.feed.product)} per dag</small></div>`:""}</div>
-   ${need.grams?`<p class="small" style="margin-top:8px">Fordelt på to måltider: <b>${r10(need.grams/2)} g</b> morgen og kveld.</p>`:`<p class="small muted" style="margin-top:8px">Velg fôr under, så regnes det om til gram.</p>`}
+  ${need?`<div class="feedres"><div class="stats" style="grid-template-columns:repeat(${need.grams?2:1},1fr)"><div><span class="cond">${Math.round(need.kcal/10)*10}</span><small>kcal per dag</small></div>${need.grams?`<div><span class="cond">${r10(need.grams)} g</span><small>${esc(need.feed.name||need.feed.product)}</small></div>`:""}</div>
+   ${need.grams&&(need.adds.length||need.water)?`<table class="mixtab"><tr><th></th><th>Per dag</th><th>Per måltid</th></tr>
+     <tr><td>${esc(need.feed.name||need.feed.product)} <span class="muted">(${Math.round(need.rest*100)} %)</span></td><td>${r10(need.grams)} g</td><td>${r10(need.grams/2)} g</td></tr>
+     ${need.adds.map(m=>`<tr><td>${esc(m.feed.product)} <span class="muted">(${Math.round(m.share*100)} %)</span></td><td>${Math.round(m.grams/5)*5} g</td><td>${Math.round(m.grams/10)*5} g</td></tr>`).join("")}
+     ${need.water?`<tr><td>Vann</td><td>${fmtKm(need.water*2)} dl</td><td>${fmtKm(need.water)} dl</td></tr>`:""}</table>`:""}
+   ${!need.grams?`<p class="small muted" style="margin-top:8px">Velg fôr under, så regnes det om til gram.</p>`:!need.adds.length&&!need.water?`<p class="small" style="margin-top:8px">Per dag. Fordelt på to måltider: <b>${r10(need.grams/2)} g</b> morgen og kveld.</p>`:""}
    ${need.adj!==1?`<p class="small warntext">${need.adj<1?`BCS ${need.bcs}: redusert med 10 % til ${esc(n)} er ved ideell vekt.`:`BCS ${need.bcs}: økt med 10 % til ${esc(n)} har fått litt mer hold.`}</p>`:""}
    <p class="small muted">${fmtKm(need.kg)} kg · hvileenergi ${Math.round(need.rer)} kcal × ${String(need.factor).replace(".",",")}${need.adj!==1?` × ${String(need.adj).replace(".",",")}`:""}</p></div>`
   :`<p class="small muted">Legg inn vekten til ${esc(n)} under «Vekt og hold», så regnes fôrmengden ut.</p>`}
   <div class="field"><label for="fd-act">Aktivitetsnivå</label><select id="fd-act">${ACTIVITY.map(a=>`<option value="${a.id}" ${(i.activity||"normal")===a.id?"selected":""}>${a.t}</option>`).join("")}</select></div>
   ${log.km>0?`<p class="small muted" style="margin-top:4px">Ut fra loggen siste 2 uker (${fmtKm(log.km)} km per dag) passer «${esc(ACTIVITY.find(a=>a.id===log.id).t.toLowerCase())}».</p>`:""}
   <div class="field"><label><input type="checkbox" id="fd-neu" ${i.neutered?"checked":""} style="width:auto;margin-right:8px">Kastrert eller sterilisert</label></div>
-  <div class="field"><label for="fd-feed">Fôr</label><select id="fd-feed">${feedOptions(i.feedId||"")}</select></div>
+  <div class="field"><label for="fd-feed">Hovedfôr</label><select id="fd-feed">${feedOptions(i.feedId||"")}</select></div>
   ${i.feedId==="custom"?`<div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="fd-name">Navn</label><input id="fd-name" value="${esc(i.feedName||"")}" maxlength="50" placeholder="Fôrets navn"></div>
    <div><label for="fd-kcal">kcal per 100 g</label><input id="fd-kcal" inputmode="decimal" value="${esc(i.feedKcal||"")}" placeholder="Står på sekken"></div></div>
    <p class="small muted" style="margin-top:4px">Står energien i MJ per kg, gang med 23,9 for å få kcal per 100 g.</p>`:""}
+  <div id="mixList">${feedMix(i).map(m=>mixRow(m.id,m.share)).join("")}</div>
+  <div class="actions" style="margin-top:10px"><button type="button" class="btn ghost" id="addMix">+ Legg til tillegg</button></div>
+  <p class="small muted" style="margin-top:4px">For eksempel VOM, rent kjøtt eller fett. Andelen er av dagens energi, og resten kommer fra hovedfôret. Rent kjøtt og fett er ikke fullfôr, så hold andelen moderat.</p>
+  <div class="field"><label for="fd-water">Vann i hvert måltid (dl, valgfritt)</label><input id="fd-water" inputmode="decimal" value="${esc(i.water||"")}" placeholder="F.eks. 3"></div>
   ${fd&&fd.supplement?`<p class="small warntext" style="margin-top:4px">Dette er et tilskuddsfôr, ikke fullfôr. Det bør ikke være det eneste hunden spiser.</p>`:""}
   ${fd&&fd.note?`<p class="small muted" style="margin-top:4px">${esc(fd.note)}</p>`:""}
   ${fd&&fd.url?`<p class="small muted" style="margin-top:4px">${fd.protein?`${String(fd.protein).replace(".",",")} % protein · ${String(fd.fat).replace(".",",")} % fett · `:""}Energiinnhold fra <a href="${esc(fd.url)}" target="_blank" rel="noopener">produktarket</a>. Sjekk sekken, oppskrifter endres.</p>`:""}
@@ -1093,7 +1109,9 @@ function bindDog(){
   const ps=$("pkStart");if(ps)ps.onclick=()=>{const d=$("pk-start").value;if(!d)return showErr("dogErr",{message:"Velg når uke 1 starter."});save({...dogInfo(n),packStart:iso(monday(parse(d)))},"Kløvplanen er startet")};
   const fdFeed=$("fd-feed");
   if(fdFeed){
-    const collect=()=>({...dogInfo(n),activity:$("fd-act").value,neutered:$("fd-neu").checked,feedId:fdFeed.value,feedName:$("fd-name")?$("fd-name").value.trim():dogInfo(n).feedName,feedKcal:$("fd-kcal")?num($("fd-kcal").value):dogInfo(n).feedKcal});
+    const collect=()=>({...dogInfo(n),activity:$("fd-act").value,neutered:$("fd-neu").checked,feedId:fdFeed.value,feedName:$("fd-name")?$("fd-name").value.trim():dogInfo(n).feedName,feedKcal:$("fd-kcal")?num($("fd-kcal").value):dogInfo(n).feedKcal,mix:[...document.querySelectorAll(".mixrow")].map(r=>({id:r.querySelector(".mx-id").value,share:Math.round(num(r.querySelector(".mx-share").value)||0)})).filter(m=>m.id&&m.share),feed2Id:"",feed2Share:"",water:num($("fd-water").value)||""});
+    const ml=$("mixList");ml.onclick=e=>{const b=e.target.closest(".rmmix");if(b)b.closest(".mixrow").remove()};
+    $("addMix").onclick=()=>{if(ml.querySelectorAll(".mixrow").length>=4)return toast("Maks fire tillegg");ml.insertAdjacentHTML("beforeend",mixRow("",""))};
     fdFeed.onchange=()=>{if(fdFeed.value==="custom")save(collect(),"Skriv inn energien fra sekken")};
     $("fdSave").onclick=()=>{const v=collect();if(v.feedId==="custom"&&!(v.feedKcal>0))return showErr("dogErr",{message:"Skriv inn kcal per 100 g fra sekken."});save(v,"Fôringen er lagret")};
   }

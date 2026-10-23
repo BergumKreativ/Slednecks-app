@@ -236,6 +236,10 @@ body.anon main{padding-bottom:40px}
 
 .feedres{border:1.5px solid var(--accent);border-radius:18px;padding:12px 14px;margin-top:8px}
 .feedres .stats{margin-top:0}
+.mixtab{width:100%;border-collapse:collapse;margin-top:10px;font-size:.9rem}
+.mixtab th{text-align:right;font-weight:600;color:var(--muted);font-size:.8rem}
+.mixtab td{padding:4px 0;border-top:1px solid var(--line)}
+.mixtab td+td,.mixtab th+th{text-align:right;white-space:nowrap;padding-left:8px}
 
 /* Bilder */
 .cover{margin:-18px -18px 18px;height:200px;overflow:hidden;background:var(--soft)}
