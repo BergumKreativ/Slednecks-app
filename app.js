@@ -199,10 +199,11 @@ async function loadAll(){
   if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",focus:Array.isArray(prof.focus)?prof.focus:[],races:Array.isArray(prof.races)?prof.races:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
-    S.isNew=true;S.view="velkommen";
+    S.isNew=true;S.view="hjem";
   }
   S.sessions=ok(o).map(rowToSession);
   const first=!S.loaded;S.loaded=true;render();
+  if(first&&S.isNew)openSetup();
   if(first){const t=trkLoad();if(t&&!t.done&&trkWatch==null)openTrack()}
 }
 // Demo: viser sporingsskjermen midt i en tur, uten å bruke GPS
@@ -221,7 +222,7 @@ function demoScreen(){
   render();
   const open={"ny-okt":()=>openForm(),"ny-okt-meg":()=>openForm(null,"meg"),"endre-okt":()=>openForm(S.sessions[0]),
     "tractive":openTractive,"mal":()=>openGoal(),"tilbakemelding":openFeedback,"dag":()=>openDay(iso(addDays(planStart(),15))),
-    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack,"import":openImport,"innsjekk":openCheckin}[k];
+    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack,"import":openImport,"innsjekk":openCheckin,"oppstart":()=>openSetup()}[k];
   if(open)open();
 }
 const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
@@ -505,6 +506,19 @@ function loadImgs(){
 const imgTag=(path,cls,alt)=>`<img class="${cls}" data-path="${esc(path)}" alt="${esc(alt||"")}">`;
 const allImagePaths=()=>[...S.sessions.flatMap(s=>s.bilder||[]),...Object.values(S.profile.dogInfo||{}).map(i=>i.photo),S.profile.cover].filter(Boolean);
 
+// Tidslinje for sesongen: hovedløpet og de andre løpene i datorekkefølge, med i dag markert. Vises når det er minst to løp.
+function raceTimeline(){
+  const p=S.profile,t=todayD(),ti=iso(t);
+  const all=[{id:"main",name:p.raceName||"Hovedløp",date:p.raceDate,km:p.raceKm,main:true},...(p.races||[])].filter(r=>parse(r.date)>=addDays(t,-30)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  if(all.length<2)return "";
+  const left=all.filter(r=>r.date>=ti).length;let nowDone=false;
+  const item=r=>{const n=Math.round((parse(r.date)-t)/864e5),past=n<0;
+    return `<li class="${r.main?"main":""}${past?" past":""}" ${!r.main&&!past?`data-tlmain="${esc(r.id)}" role="button" tabindex="0"`:""}><i></i><span><b>${esc(r.name)}</b>${r.main?' <span class="tag">Hovedløp</span>':""}<br>
+      <span class="small muted">${esc(fmtD(parse(r.date)))}${r.km?` · ${fmtKm(r.km)} km`:""} · ${past?"kjørt ✓":n===0?"i dag":`om ${n} ${n===1?"dag":"dager"}`}</span></span></li>`};
+  const rows=all.map(r=>{let h="";if(!nowDone&&r.date>=ti){nowDone=true;h='<li class="now"><i></i><span class="small"><b>I dag</b></span></li>'}return h+item(r)}).join("")+(nowDone?"":'<li class="now"><i></i><span class="small"><b>I dag</b></span></li>');
+  return `<div class="tl"><div class="row"><h3>Sesongen</h3><span class="small muted">${left} ${left===1?"løp":"løp"} igjen</span></div><ol class="tlist">${rows}</ol>
+   <p class="small muted" style="margin:4px 0 0">Trykk på et løp for å gjøre det til hovedløp.</p></div>`;
+}
 function upcomingRaces(){
   const list=otherRaces().filter(r=>r.date>=iso(todayD()));
   return list.length?`<p class="small center muted" style="margin-top:4px">Også: ${list.slice(0,3).map(r=>`${esc(r.name)} ${esc(fmtD(parse(r.date)))}`).join(" · ")}${list.length>3?` og ${list.length-3} til`:""}</p>`:"";
@@ -533,7 +547,7 @@ function vHome(){
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   ${competes()&&!hasRace()?`<div class="norace"><p><b>${icon("flag","sm")} Trener du mot et løp?</b></p><p class="small">Velg løpet fra kalenderen eller legg inn ditt eget, så får du nedtelling og en treningsplan.</p><div class="actions" style="margin-top:8px"><button type="button" class="btn sm" data-goto="innst">Velg løp</button></div></div>`:""}
   ${competes()&&hasRace()?`<section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>`:""}
-  ${competes()?upcomingRaces():""}
+  ${competes()&&hasRace()?(raceTimeline()||upcomingRaces()):""}
   ${competes()&&S.profile.dogs.length?`<div class="actions" style="margin-top:8px"><button type="button" class="btn line sm" id="ciOpen">${icon("syringe","sm")} Innsjekk: chip, vaksiner og lisens</button></div>`:""}
   ${wxTop()}
   ${competes()&&hasRace()?progressCard(t):""}
@@ -820,6 +834,73 @@ function vaccineStatus(v){
   return{c:"ok",t:`Gyldig til ${parse(v.until).toLocaleDateString("nb-NO")}`};
 }
 function ageMonths(born,at){const b=parse(born),a=at||todayD();let m=(a.getFullYear()-b.getFullYear())*12+a.getMonth()-b.getMonth();if(a.getDate()<b.getDate())m--;return m}
+/* Oppstart: ett spørsmål per skjerm som tilpasser appen. Kommer automatisk for nye brukere, og kan kjøres igjen fra Profil.
+   Hvert steg lagres når man går videre, så man kan avbryte når som helst. */
+function openSetup(start=0){
+  const Q={i:start,dogs:["",""],race:null,goal:null,busy:false};
+  const steps=()=>["navn","hunder","fokus",...(competes()?["lop"]:[]),...(focus().includes("meg")?["mal"]:[]),"import","vaer","ferdig"];
+  const save=async patch=>ok(await sb.from("profiles").update({...patch,updated_at:new Date().toISOString()}).eq("user_id",S.user.id));
+  const body={
+    navn:()=>`<h2 id="formTitle">Hva vil du kalles?</h2><p class="small muted">Navnet vises på føremeldinger du deler og på innsjekk-kortet. Du kan bruke fornavn eller kallenavn.</p>
+      <div class="field"><input id="su-name" maxlength="40" value="${esc(S.profile.nickname||"")}" placeholder="F.eks. Kari" autocomplete="nickname"></div>`,
+    hunder:()=>`<h2 id="formTitle">Hvem er hundene dine?</h2><p class="small muted">Skriv navnet på hver hund. Vekt, chip og vaksiner legger du inn senere på hundesiden.</p>
+      ${S.profile.dogs.length?`<p class="small">Du har allerede: <b>${S.profile.dogs.map(esc).join(", ")}</b></p>`:""}
+      <div id="su-dogs">${Q.dogs.map((d,i)=>`<div class="field"><input class="su-dog" data-i="${i}" maxlength="30" value="${esc(d)}" placeholder="${S.profile.dogs.length?"Ny hund":"Navn på hund "+(i+1)}"></div>`).join("")}</div>
+      <button type="button" class="linkbtn small" id="su-more">+ Flere hunder</button>`,
+    fokus:()=>`<h2 id="formTitle">Hva trener dere mot denne sesongen?</h2><p class="small muted">Velg så mange du vil. Appen viser bare økttyper og innhold som passer.</p>
+      <div class="chips" style="margin-top:10px">${Object.entries(FOCUS).map(([k,f])=>`<button type="button" class="chip" data-sufocus="${k}" aria-pressed="${focus().includes(k)}">${esc(f.label)}</button>`).join("")}</div>`,
+    lop:()=>`<h2 id="formTitle">${hasRace()?"Skal dere på flere løp?":"Har dere et løp i sesongen?"}</h2>
+      <p class="small muted">${hasRace()?`Hovedløpet er <b>${esc(S.profile.raceName)}</b> ${esc(fmtD(parse(S.profile.raceDate)))}. Legg til et løp til, eller gå videre.`:"Velg fra løpskalenderen eller skriv inn ditt eget. Da får du nedtelling og en treningsplan fram mot løpet."}</p>
+      <div class="field"><label for="x-pick">Løp</label><select id="x-pick">${raceOptions("")}</select></div>
+      <div class="field" id="x-classWrap"></div>
+      <div class="field"><label for="x-name">Navn på løpet</label><input id="x-name" maxlength="60" placeholder="F.eks. Finnskogløpet"></div>
+      <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="x-date">Dato</label><input id="x-date" type="date"></div><div><label for="x-km">Distanse (km)</label><input id="x-km" inputmode="decimal" placeholder="Valgfritt"></div></div>`,
+    mal:()=>`<h2 id="formTitle">Hva er målet ditt selv?</h2><p class="small muted">For eksempel Galdhøpiggen med 12 kg sekk, eller 10 km løping på under timen.</p>
+      ${(S.profile.myGoals||[]).map(g=>`<p class="small">✓ <b>${esc(g.name)}</b></p>`).join("")}
+      <div class="field"><label for="su-goal">Mål</label><input id="su-goal" maxlength="60" placeholder="Beskriv målet"></div>
+      <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="su-gtype">Type</label><select id="su-gtype">${MY_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div><div><label for="su-gdate">Når</label><input id="su-gdate" type="date"></div></div>`,
+    import:()=>`<h2 id="formTitle">Har du trent allerede denne sesongen?</h2><p class="small muted">Hent inn øktene fra Strava, klokka eller Tractive, så er loggen og planen oppdatert fra start. ${S.sessions.length?`Du har ${S.sessions.length} økter i loggen nå.`:""}</p>
+      <div class="actions" style="margin-top:12px"><button type="button" class="btn line" id="su-import">Importer økter</button></div>`,
+    vaer:()=>`<h2 id="formTitle">Vil du se været der du er?</h2><p class="small muted">Appen viser temperatur, vind og værmelding hver gang du åpner den, og velger vinter- eller barmarksmodus etter været. Posisjonen lagres bare på telefonen din.</p>
+      <div class="actions" style="margin-top:12px">${savedPos()?`<p class="small"><b>✓ Posisjon er slått på</b></p>`:`<button type="button" class="btn line" id="su-pos">Slå på posisjon</button>`}</div>`,
+    ferdig:()=>`<h2 id="formTitle">Alt klart!</h2><p>Appen er tilpasset deg. Du kan endre alt under Profil, og kjøre disse spørsmålene igjen der.</p>
+      <p class="small muted">Tips: Legg appen på hjem-skjermen. ${/iPhone|iPad/.test(navigator.userAgent)?"I Safari: trykk Del-knappen og «Legg til på Hjem-skjerm».":"I Chrome: trykk ⋮ og «Legg til på startskjermen»."}</p>`,
+  };
+  const draw=()=>{
+    const st=steps(),k=st[Math.min(Q.i,st.length-1)],last=k==="ferdig";
+    panel.innerHTML=`<div class="row"><div class="sudots" aria-label="Steg ${Q.i+1} av ${st.length}">${st.map((_,i)=>`<i class="${i<=Q.i?"on":""}"></i>`).join("")}</div><button class="btn ghost" id="suClose">${last?"Lukk":"Senere"}</button></div>
+     <div class="setup">${body[k]()}</div><p class="err" id="suErr" hidden></p>
+     <div class="actions">${Q.i>0?`<button type="button" class="btn ghost" id="suBack">Tilbake</button>`:""}${last?"":`<button type="button" class="btn ghost" id="suSkip">Hopp over</button>`}<button type="button" class="btn" id="suNext">${last?"Til Oversikt":"Neste"}</button></div>`;
+    const $=id=>panel.querySelector("#"+id);
+    $("suClose").onclick=()=>{closeForm();render()};
+    if($("suBack"))$("suBack").onclick=()=>{Q.i--;draw()};
+    if($("suSkip"))$("suSkip").onclick=()=>{Q.i++;draw()};
+    if(k==="hunder")$("su-more").onclick=()=>{panel.querySelectorAll(".su-dog").forEach(x=>Q.dogs[x.dataset.i]=x.value);Q.dogs.push("");draw()};
+    if(k==="fokus")panel.querySelectorAll("[data-sufocus]").forEach(b=>b.onclick=()=>{const f=b.dataset.sufocus,cur=focus();S.profile.focus=cur.includes(f)?cur.filter(x=>x!==f):[...cur,f];draw()});
+    if(k==="lop"){const fillClass=()=>{const r=raceById($("x-pick").value),c=$("x-class"),kk=r&&c&&r.classes.find(x=>x.name===c.value);if(kk)$("x-km").value=fmtKm(kk.km)};
+      $("x-pick").onchange=()=>{const r=raceById($("x-pick").value);$("x-classWrap").innerHTML=classSelect($("x-pick").value,"x-class");if(r){$("x-name").value=r.name;$("x-date").value=r.date;const c=$("x-class");if(c){c.onchange=fillClass;if(r.classes.length===1){c.value=r.classes[0].name;fillClass()}}}}}
+    if(k==="import")$("su-import").onclick=()=>{Q.i++;openImport()};
+    if(k==="vaer"&&$("su-pos"))$("su-pos").onclick=()=>{askPos();setTimeout(draw,1500)};
+    $("suNext").onclick=async()=>{
+      if(last){closeForm();S.isNew=false;S.view="hjem";render();window.scrollTo(0,0);return}
+      $("suNext").disabled=true;
+      try{
+        if(k==="navn"){const v=$("su-name").value.trim();if(v!==(S.profile.nickname||"")){await save({nickname:v});S.profile.nickname=v}}
+        if(k==="hunder"){const add=[...panel.querySelectorAll(".su-dog")].map(x=>x.value.trim()).filter(Boolean),dogs=[...new Set([...S.profile.dogs,...add])];
+          if(dogs.length!==S.profile.dogs.length){await save({dogs});S.profile.dogs=dogs}Q.dogs=["",""]}
+        if(k==="fokus")await save({focus:focus()});
+        if(k==="lop"){const pick=$("x-pick").value,c=$("x-class"),name=$("x-name").value.trim(),date=$("x-date").value;
+          if(name||date){if(!name||!date){$("suNext").disabled=false;return showErr("suErr",{message:"Fyll inn både navn og dato, eller trykk «Hopp over»."})}
+            const raceId=pick?pick+(c&&c.value?"|"+c.value:""):"",km=num($("x-km").value)||0,full=name+(c&&c.value&&!hasRace()?"":c&&c.value?` – ${c.value}`:"");
+            if(!hasRace()){const prof={...S.profile,raceId,raceName:name,raceDate:date,raceKm:km||S.profile.raceKm,raceHm:0};await save(profileRow(prof));Object.assign(S.profile,prof)}
+            else await saveRaces([...(S.profile.races||[]),{id:"r"+Date.now().toString(36),raceId,name:full,date,km,hm:0}]);}}
+        if(k==="mal"){const name=$("su-goal").value.trim();if(name){const list=[...(S.profile.myGoals||[]),{id:newId(),name,type:$("su-gtype").value,km:null,hm:null,kg:null,date:$("su-gdate").value||""}];await save({my_goals:list});S.profile.myGoals=list}}
+        Q.i++;draw();render();
+      }catch(e){$("suNext").disabled=false;showErr("suErr",e)}
+    };
+  };
+  sheet.classList.add("open");draw();
+}
 /* Innsjekk på løp: alle hundene med chip, vaksiner, hold og vekt, pluss startlisens, samlet på én skjerm som kan lagres som bilde.
    Vaksinene sjekkes mot løpsdatoen når løpet er fram i tid. */
 function checkinData(){
@@ -1220,6 +1301,7 @@ function vSettings(){
   ${sh("target","Fokus for sesongen","plan","margin-top:6px")}
   <p class="muted">Hva trener du mot? Appen viser bare økttyper og innhold som passer. Velg så mange du vil.</p>
   ${focusChips()}
+  <div class="actions" style="margin-top:10px"><button type="button" class="btn line sm" id="setupOpen">Tilpass appen med spørsmål</button></div>
   ${sh("image","Forsidebilde","me")}
   <p class="muted">Et bilde av deg og hundene øverst på Oversikt.</p>
   ${p.cover?`<div class="cover small">${imgTag(p.cover,"","Forsidebilde")}</div>`:""}
@@ -1729,6 +1811,8 @@ function bind(){
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
+  document.querySelectorAll("[data-tlmain]").forEach(b=>b.onclick=async()=>{const r=(S.profile.races||[]).find(x=>x.id===b.dataset.tlmain);if(!r||!confirm(`Gjøre ${r.name} til hovedløp? Treningsplanen bygges da mot dette løpet.`))return;try{await makeMainRace(r.id)}catch(e){toast(errText(e))}});
+  ["setupOpen"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=()=>openSetup()});
   ["ciOpen","ciOpen2"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openCheckin});
   document.querySelectorAll("[data-focus]").forEach(b=>b.onclick=()=>toggleFocus(b.dataset.focus));
   document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});

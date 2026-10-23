@@ -437,3 +437,23 @@ body.th-vinter{--grad:linear-gradient(135deg,#0A1A3F 0%,#173E7A 42%,#1B7F95 74%,
 .cichip{font-variant-numeric:tabular-nums;letter-spacing:.04em;font-size:1.1rem}
 .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;background:var(--warn)}
 .dot.good{background:var(--good)}.dot.bad{background:var(--bad)}
+/* Tidslinje for løpene i sesongen */
+.tl{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-top:10px;text-align:left}
+.tl h3{margin:0}
+.tlist{list-style:none;margin:10px 0 0;padding:0 0 0 4px;position:relative}
+.tlist::before{content:"";position:absolute;left:10px;top:8px;bottom:8px;width:2px;background:var(--line)}
+.tlist li{display:flex;gap:12px;align-items:flex-start;padding:6px 0;position:relative}
+.tlist li i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);background:var(--card);flex:none;margin-top:4px;position:relative;z-index:1}
+.tlist li.main i{width:18px;height:18px;margin-left:-2px;border:0;background:var(--grad-btn)}
+.tlist li.past{opacity:.55}
+.tlist li.past i{background:var(--line);border-color:var(--line)}
+.tlist li.now i{width:10px;height:10px;margin:5px 2px 0;border:0;background:var(--accent)}
+.tlist li.now{padding:2px 0}
+.tlist li[data-tlmain]{cursor:pointer}
+.tag{display:inline-block;font-size:.72rem;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--ink);color:var(--bg);vertical-align:2px}
+/* Oppstart med spørsmål */
+.setup{min-height:240px;padding-top:6px}
+.setup h2{margin:6px 0 6px;font-size:1.45rem}
+.sudots{display:flex;gap:6px}
+.sudots i{width:22px;height:4px;border-radius:2px;background:var(--line)}
+.sudots i.on{background:var(--grad-btn)}
