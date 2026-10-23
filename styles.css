@@ -423,3 +423,17 @@ body.th-vinter{--grad:linear-gradient(135deg,#0A1A3F 0%,#173E7A 42%,#1B7F95 74%,
 .wxhours span{display:flex;flex-direction:column;align-items:center;gap:2px}
 .wxhours small{color:var(--muted);font-size:.72rem}
 .wxhours b{font-weight:500}
+.norace{background:var(--card);border:1px dashed var(--line);border-radius:18px;padding:14px 16px;text-align:center;margin-top:4px}
+.norace .actions{justify-content:center}
+/* Innsjekk-kort */
+.checkin{margin-top:10px}
+.cihead{background:var(--grad);color:#fff;border-radius:18px;padding:14px 16px;line-height:1.4}
+.cilic{display:flex;align-items:center;gap:8px;margin:12px 0}
+.cidog{background:var(--soft);border-radius:18px;padding:12px 14px;margin-bottom:10px}
+.ciname{font-size:1.3rem}
+.cidog dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:8px 0 0}
+.cidog dt{color:var(--muted);font-size:.88rem}
+.cidog dd{margin:0;font-weight:600;display:flex;align-items:center;gap:6px}
+.cichip{font-variant-numeric:tabular-nums;letter-spacing:.04em;font-size:1.1rem}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;background:var(--warn)}
+.dot.good{background:var(--good)}.dot.bad{background:var(--bad)}

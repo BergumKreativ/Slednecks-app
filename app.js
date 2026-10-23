@@ -120,6 +120,8 @@ const FOCUS={
 };
 const focus=()=>(S.profile.focus||[]).filter(k=>FOCUS[k]);
 const hasFocus=k=>!focus().length||focus().includes(k);
+// Nye profiler får en løpsdato 12 uker fram så planen har noe å regne fra; et løp er bare valgt når det har navn eller kommer fra kalenderen
+const hasRace=()=>!!(S.profile.raceName||S.profile.raceId);
 const competes=()=>!focus().length||focus().some(k=>FOCUS[k].race);
 const focusDogTypes=()=>{const f=focus().filter(k=>FOCUS[k].dog);return f.length?[...new Set(f.flatMap(k=>FOCUS[k].dog).concat("Annet"))]:null};
 const focusChips=()=>`<div class="chips">${Object.entries(FOCUS).map(([k,f])=>`<button type="button" class="chip" data-focus="${k}" aria-pressed="${focus().includes(k)}">${esc(f.label)}</button>`).join("")}</div>`;
@@ -219,7 +221,7 @@ function demoScreen(){
   render();
   const open={"ny-okt":()=>openForm(),"ny-okt-meg":()=>openForm(null,"meg"),"endre-okt":()=>openForm(S.sessions[0]),
     "tractive":openTractive,"mal":()=>openGoal(),"tilbakemelding":openFeedback,"dag":()=>openDay(iso(addDays(planStart(),15))),
-    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack,"import":openImport}[k];
+    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack,"import":openImport,"innsjekk":openCheckin}[k];
   if(open)open();
 }
 const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
@@ -529,10 +531,12 @@ function vHome(){
   return `<div class="home">
   ${seasonBar()}
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
-  ${competes()?`<section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>`:""}
+  ${competes()&&!hasRace()?`<div class="norace"><p><b>${icon("flag","sm")} Trener du mot et løp?</b></p><p class="small">Velg løpet fra kalenderen eller legg inn ditt eget, så får du nedtelling og en treningsplan.</p><div class="actions" style="margin-top:8px"><button type="button" class="btn sm" data-goto="innst">Velg løp</button></div></div>`:""}
+  ${competes()&&hasRace()?`<section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>`:""}
   ${competes()?upcomingRaces():""}
+  ${competes()&&S.profile.dogs.length?`<div class="actions" style="margin-top:8px"><button type="button" class="btn line sm" id="ciOpen">${icon("syringe","sm")} Innsjekk: chip, vaksiner og lisens</button></div>`:""}
   ${wxTop()}
-  ${competes()?progressCard(t):""}
+  ${competes()&&hasRace()?progressCard(t):""}
   ${S.loaded&&!S.sessions.length?`<p class="notice center" style="margin-top:12px">${icon("route","sm")} Har du trent allerede denne sesongen? <button type="button" class="linkbtn" id="hmImport">Hent inn øktene dine</button></p>`:""}
   ${trackCard()}
   ${trail(bw,t)}
@@ -816,6 +820,72 @@ function vaccineStatus(v){
   return{c:"ok",t:`Gyldig til ${parse(v.until).toLocaleDateString("nb-NO")}`};
 }
 function ageMonths(born,at){const b=parse(born),a=at||todayD();let m=(a.getFullYear()-b.getFullYear())*12+a.getMonth()-b.getMonth();if(a.getDate()<b.getDate())m--;return m}
+/* Innsjekk på løp: alle hundene med chip, vaksiner, hold og vekt, pluss startlisens, samlet på én skjerm som kan lagres som bilde.
+   Vaksinene sjekkes mot løpsdatoen når løpet er fram i tid. */
+function checkinData(){
+  const p=S.profile,race=parse(p.raceDate),ref=race>=todayD()?race:todayD(),fmt=d=>parse(d).toLocaleDateString("nb-NO");
+  const vac=(i,type)=>{const v=byDateDesc(i.vaccines).find(x=>x.type===type);if(!v)return{t:"Mangler",c:type==="DHP"?"bad":""}; // kennelhoste er anbefalt, ikke påkrevd
+    if(!v.until)return{t:`Tatt ${fmt(v.d)}`,c:""};
+    return parse(v.until)<ref?{t:`Går ut ${fmt(v.until)}${race>=todayD()?", før løpet":""}`,c:"bad"}:{t:`Gyldig til ${fmt(v.until)}`,c:"ok"}};
+  const dogs=p.dogs.map(n=>{const i=dogInfo(n),w=byDateDesc(i.weights)[0],m=i.born?Math.floor((todayD()-parse(i.born))/(30.44*864e5)):null;
+    return{name:n,meta:[i.breed,i.sex,m!=null?ageText(m):""].filter(Boolean).join(" · "),chip:i.chip||"",dhp:vac(i,"DHP"),kh:vac(i,"KH"),
+      bcs:w&&w.bcs?`${w.bcs}/9`:"",kg:w&&w.kg?`${fmtKm(w.kg)} kg`:"",wd:w?fmt(w.d):""}});
+  const l=p.lisens||"",lic=l==="engang"?{t:"Engangslisens registrert",c:"ok"}:l.startsWith("aars:")?(licenseOk()?{t:`Årslisens ${seasonLabel(Number(l.slice(5)))} registrert`,c:"ok"}:{t:`Årslisens ${seasonLabel(Number(l.slice(5)))} gjelder ikke denne sesongen`,c:"bad"}):{t:"Ingen lisens registrert",c:"bad"};
+  return{race:p.raceName||"Løp",date:race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long",year:"numeric"}),who:p.nickname||(S.user&&S.user.email)||"",lic,dogs};
+}
+function openCheckin(){
+  const D=checkinData(),dot=c=>`<i class="dot ${c==="ok"?"good":c==="bad"?"bad":"warn"}"></i>`;
+  panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Innsjekk</h2><button class="btn ghost" id="ciClose">Lukk</button></div>
+  <div class="checkin">
+   <div class="cihead"><b>${esc(D.race)}</b><br>${esc(D.date)}${D.who?`<br>${esc(D.who)}`:""}</div>
+   <p class="cilic">${dot(D.lic.c)} Startlisens: <b>${esc(D.lic.t)}</b></p>
+   ${D.dogs.map(d=>`<div class="cidog"><div class="row"><b class="ciname">${esc(d.name)}</b><span class="small muted">${esc(d.meta)}</span></div>
+    <dl><dt>Chip</dt><dd class="cichip">${d.chip?esc(d.chip):`${dot("bad")} Mangler`}</dd>
+     <dt>DHP</dt><dd>${dot(d.dhp.c)} ${esc(d.dhp.t)}</dd>
+     <dt>Kennelhoste</dt><dd>${dot(d.kh.c)} ${esc(d.kh.t)}</dd>
+     <dt>Hold og vekt</dt><dd>${d.bcs||d.kg?`${esc([d.bcs?"BCS "+d.bcs:"",d.kg].filter(Boolean).join(" · "))} <span class="small muted">(${esc(d.wd)})</span>`:"Ikke registrert"}</dd></dl></div>`).join("")||`<p class="small muted">Legg til hundene dine under Profil.</p>`}
+   <p class="small muted">Lisensen er det du har registrert i appen. Sjekk i Min idrett at den er betalt og godkjent.</p>
+  </div>
+  <div class="actions"><button class="btn" id="ciSave">${icon("image","sm")} Lagre som bilde</button></div>`;
+  panel.querySelector("#ciClose").onclick=closeForm;
+  panel.querySelector("#ciSave").onclick=()=>saveCheckinImage(D).catch(e=>toast(errText(e)));
+  sheet.classList.add("open");
+}
+// Tegner innsjekk-kortet som PNG, og deler det (telefon) eller laster det ned (PC)
+async function saveCheckinImage(D){
+  const W=1080,pad=56,dogH=330,H=420+D.dogs.length*(dogH+24)+90,c=document.createElement("canvas");
+  c.width=W;c.height=H;const g=c.getContext("2d"),F='"Hanken Grotesk",Arial,sans-serif',cs=getComputedStyle(document.body);
+  const col=v=>({ok:"#2E8B57",bad:"#C8102E","":"#D99A00"})[v]||"#D99A00";
+  g.fillStyle="#fff";g.fillRect(0,0,W,H);
+  const grd=g.createLinearGradient(0,0,W,300);const th=document.body.classList.contains("th-vinter");
+  (th?["#0A1A3F","#173E7A","#23997F"]:["#A80D26","#C2381A","#D2611C"]).forEach((x,i)=>grd.addColorStop(i/2,x));
+  g.fillStyle=grd;g.fillRect(0,0,W,300);
+  // Løpsnavnet krympes til det får plass på én linje
+  let fs=58;g.fillStyle="#fff";do{g.font=`700 ${fs}px ${F}`;fs-=2}while(fs>30&&g.measureText(D.race).width>W-2*pad);g.fillText(D.race,pad,110);
+  g.font=`400 36px ${F}`;g.fillText(D.date,pad,170);if(D.who)g.fillText(D.who,pad,222);
+  g.font=`600 30px ${F}`;g.fillText("INNSJEKK · "+APP_NAME.toUpperCase(),pad,272);
+  let y=360;g.fillStyle=col(D.lic.c);g.beginPath();g.arc(pad+12,y-12,12,0,7);g.fill();
+  g.fillStyle="#111";g.font=`600 36px ${F}`;g.fillText("Startlisens: "+D.lic.t,pad+40,y);
+  y+=50;
+  for(const d of D.dogs){
+    g.fillStyle="#F4F2F0";g.beginPath();g.roundRect(pad-16,y,W-2*pad+32,dogH,28);g.fill();
+    let yy=y+66;g.fillStyle="#111";g.font=`700 50px ${F}`;g.fillText(d.name,pad+16,yy);
+    const nw=g.measureText(d.name).width;g.fillStyle="#666";g.font=`400 30px ${F}`;g.fillText(d.meta,pad+16+nw+24,yy);
+    const row=(label,val,c)=>{yy+=62;g.font=`500 30px ${F}`;g.fillStyle="#666";g.fillText(label,pad+16,yy);
+      let x=pad+290;if(c!==undefined){g.fillStyle=col(c);g.beginPath();g.arc(x+11,yy-11,11,0,7);g.fill();x+=36}
+      g.fillStyle="#111";g.font=`600 36px ${F}`;g.fillText(val,x,yy)};
+    row("Chip",d.chip||"Mangler",d.chip?undefined:"bad");
+    row("DHP",d.dhp.t,d.dhp.c);
+    row("Kennelhoste",d.kh.t,d.kh.c);
+    row("Hold og vekt",[d.bcs?"BCS "+d.bcs:"",d.kg].filter(Boolean).join(" · ")||"Ikke registrert");
+    y+=dogH+24;
+  }
+  g.fillStyle="#888";g.font=`400 26px ${F}`;g.fillText(`Laget ${new Date().toLocaleDateString("nb-NO")} i ${APP_NAME}. Lisens slik den er registrert i appen.`,pad,H-40);
+  const blob=await new Promise(r=>c.toBlob(r,"image/png")),name=`innsjekk-${iso(new Date())}.png`,file=new File([blob],name,{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"Innsjekk"});return}catch(e){if(e.name==="AbortError")return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast("Bildet er lagret");
+}
 const ageText=m=>m<24?`${m} mnd`:`${Math.floor(m/12)} år${m%12?` og ${m%12} mnd`:""}`;
 function dogWarnings(n){
   const i=dogInfo(n), w=[], race=S.profile.raceDate;
@@ -1183,7 +1253,7 @@ function vSettings(){
   ${sh("paw-print","Hundene","dog")}
   <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
   <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
-  <div class="actions" style="margin-top:12px"><button class="btn ghost" id="addDog">+ Legg til hund</button></div>
+  <div class="actions" style="margin-top:12px"><button class="btn ghost" id="addDog">+ Legg til hund</button>${S.profile.dogs.length?`<button type="button" class="btn ghost" id="ciOpen2">Innsjekk-kort</button>`:""}</div>
   <div class="actions"><button class="btn" id="saveSet">Lagre</button></div><p class="err" id="setErr" hidden></p>
   ${sh("shield","Backup","plan")}
   <p class="muted">Last ned alle øktene som en fil, eller hent inn økter fra en tidligere backup. Økter som allerede finnes hoppes over.</p>
@@ -1659,6 +1729,7 @@ function bind(){
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
+  ["ciOpen","ciOpen2"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openCheckin});
   document.querySelectorAll("[data-focus]").forEach(b=>b.onclick=()=>toggleFocus(b.dataset.focus));
   document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});
   document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const k=b.dataset.season;try{k==="auto"||k===autoSeason()?localStorage.removeItem("sn-season"):localStorage.setItem("sn-season",k)}catch(e){}render()});
