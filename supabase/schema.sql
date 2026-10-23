@@ -43,6 +43,9 @@ alter table public.okter add column if not exists last_kg numeric;
 -- Vær under økta (temperatur °C og relativ luftfuktighet %)
 alter table public.okter add column if not exists temp numeric;
 alter table public.okter add column if not exists rh   numeric;
+-- Rute fra GPX: [[lat, lon, høyde], …] forenklet til maks ~500 punkter. kilde = 'gpx' (senere 'strava', 'gps')
+alter table public.okter add column if not exists rute  jsonb;
+alter table public.okter add column if not exists kilde text not null default '';
 -- Egne mål: [{ id, name, type, km, hm, kg, date }]
 alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
 

@@ -108,7 +108,7 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
 const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
-const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null});
+const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||""});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
 const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
@@ -632,7 +632,7 @@ function vLog(){
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
-      <span><span class="t">${esc(typeOf(s.type,s.kategori))}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
+      <span><span class="t">${esc(typeOf(s.type,s.kategori))}${s.rute?` <span class="muted" title="Har rute">· kart</span>`:""}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
       <span class="k">${s.km?fmtKm(s.km):""}</span></button>`}).join("")}</section>`}).join("");
 }
 
@@ -737,6 +737,32 @@ function vSettings(){
 /* Skjema */
 let editing=null,F=null;
 const panel=document.getElementById("panel"),sheet=document.getElementById("sheet");
+/* Kart fra Kartverket (topografisk) med Leaflet */
+let fMap=null;
+const KARTVERKET="https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png";
+function drawRoute(el,route){
+  if(!window.L||!el||!route||route.length<2)return null;
+  const m=L.map(el,{scrollWheelZoom:false,attributionControl:true});
+  L.tileLayer(KARTVERKET,{maxZoom:18,attribution:'© <a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a>'}).addTo(m);
+  const color=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#D7263D";
+  const line=L.polyline(route.map(p=>[p[0],p[1]]),{color,weight:4,opacity:.9}).addTo(m);
+  L.circleMarker([route[0][0],route[0][1]],{radius:6,color:"#fff",weight:2,fillColor:"#2E8B57",fillOpacity:1}).addTo(m).bindTooltip("Start");
+  L.circleMarker([route[route.length-1][0],route[route.length-1][1]],{radius:6,color:"#fff",weight:2,fillColor:color,fillOpacity:1}).addTo(m).bindTooltip("Slutt");
+  m.fitBounds(line.getBounds(),{padding:[18,18]});
+  setTimeout(()=>{m.invalidateSize();m.fitBounds(line.getBounds(),{padding:[18,18]})},60);
+  return m;
+}
+async function loadGpx(file){
+  const g=GPX.parse(await file.text());
+  if(g.start)F.dato=iso(g.start);
+  F.km=String(Math.round(g.km*100)/100).replace(".",",");
+  if(g.hm)F.hm=String(g.hm);
+  if(g.min)F.min=String(g.min);
+  F.rute=g.route;F.kilde="gpx";
+  if(!F.kommentar&&g.name)F.kommentar=g.name;
+  if(g.start&&iso(g.start)!==iso(new Date())){F.temp="";F.rh=""}
+  return g;
+}
 function openForm(s,kat){
   editing=s||null;
   const last=dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0];
@@ -745,14 +771,18 @@ function openForm(s,kat){
   F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);
   if(!s){const w=wxNow();if(w){F.temp=fmtKm(w.temp);F.rh=Math.round(w.rh)}}F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
   if(!F.min)F.min="";if(!F.hm)F.hm="";
-  draw();sheet.classList.add("open");
+  sheet.classList.add("open");draw();
 }
-function closeForm(){sheet.classList.remove("open");editing=null}
+function closeForm(){sheet.classList.remove("open");editing=null;if(fMap){fMap.remove();fMap=null}}
 function draw(){
   const me=F.kategori==="meg", dogs=Array.from(new Set([...S.profile.dogs,...F.hunder])), pd=planDay(parse(F.dato||iso(new Date())));
   panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">${editing?"Endre økt":"Ny økt"}</h2><button class="btn ghost" id="fClose">Lukk</button></div>
   ${pd&&pd.item[1]?`<p class="muted small" style="margin-top:6px">Plan denne dagen: ${esc(pd.item[0])}</p>`:""}
   ${editing?"":`<div class="seg" role="group" aria-label="Hvem trente"><button type="button" data-kat="hund" aria-pressed="${!me}">Med hunder</button><button type="button" data-kat="meg" aria-pressed="${me}">Bare meg</button></div>`}
+  <div class="field gpxrow"><button type="button" class="btn line" id="gpxBtn">${F.rute?"Bytt GPX-fil":"Hent tur fra GPX-fil"}</button><input type="file" id="gpxFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
+   ${F.rute?"":`<p class="small muted" style="margin-top:6px">Eksporter turen som GPX fra klokka, Strava, Garmin Connect, Komoot eller UT.no. Distanse, høydemeter, tid og dato fylles ut.</p>`}</div>
+  ${F.rute?`<div id="f-map" class="map" role="img" aria-label="Kart over ruta"></div><p class="small muted" style="margin-top:6px">${F.rute.length} punkter · <button type="button" class="linkbtn" id="gpxRemove">Fjern ruta</button></p>`:""}
+  <p class="err" id="gpxErr" hidden></p>
   <div class="field"><label for="f-dato">Dato</label><input id="f-dato" type="date" value="${esc(F.dato)}"></div>
   <div class="field"><span class="flabel">Type økt</span><div class="chips">${(me?MY_TYPES:TYPES).map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")}</div></div>
   <div class="field grid3"><div><label for="f-km">Km</label><input id="f-km" inputmode="decimal" value="${esc(F.km)}" placeholder="0"></div>
@@ -770,6 +800,12 @@ function draw(){
   <div class="actions">${editing?`<button class="btn del" id="fDel">Slett</button>`:""}<button class="btn" id="fSave">${editing?"Lagre endringer":"Lagre økt"}</button></div>`;
   const keep=()=>{const kgEl=panel.querySelector("#f-kg");if(kgEl)F.last_kg=kgEl.value;F.temp=panel.querySelector("#f-temp").value;F.rh=panel.querySelector("#f-rh").value;F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
   panel.querySelector("#fClose").onclick=closeForm;
+  if(fMap){fMap.remove();fMap=null}
+  if(F.rute)fMap=drawRoute(panel.querySelector("#f-map"),F.rute);
+  const gf=panel.querySelector("#gpxFile");
+  panel.querySelector("#gpxBtn").onclick=()=>gf.click();
+  gf.onchange=async()=>{const f=gf.files[0];if(!f)return;keep();try{await loadGpx(f);draw();toast("Turen er hentet fra fila")}catch(e){showErr("gpxErr",e)}};
+  const gr=panel.querySelector("#gpxRemove");if(gr)gr.onclick=()=>{keep();F.rute=null;F.kilde="";draw()};
   panel.querySelector("#f-dato").onchange=()=>{keep();draw()};
   panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");draw()});
   panel.querySelectorAll("[data-rpe]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.rpe);F.rpe=F.rpe===v?null:v;draw()});
@@ -804,7 +840,7 @@ function openDay(date){
   const r=panel.querySelector("#dReset");if(r)r.onclick=()=>put(null);
 }
 const num=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:0};
-const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null,temp:String(s.temp??"").trim()!==""?num(s.temp):null,rh:String(s.rh??"").trim()!==""?Math.round(num(s.rh)):null}};
+const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null,temp:String(s.temp??"").trim()!==""?num(s.temp):null,rh:String(s.rh??"").trim()!==""?Math.round(num(s.rh)):null,rute:s.rute||null,kilde:s.rute?s.kilde||"gpx":""}};
 async function save(){
   if(!F.dato)return showErr("fErr",{message:"Velg en dato."});
   if(!num(F.km)&&!num(F.min)&&!F.kommentar.trim())return showErr("fErr",{message:"Skriv inn km, minutter eller en kommentar."});
