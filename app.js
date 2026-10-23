@@ -825,7 +825,7 @@ function dogCard(n){
   const warn=dogWarnings(n), lw=lastWeight(n);
   return `<button type="button" class="dog" data-dogpage="${esc(n)}">${dogInfo(n).photo?imgTag(dogInfo(n).photo,"avatar",n):""}<div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
     <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}${lw?`<br>${fmtKm(lw.kg)} kg${lw.bcs?` · BCS ${lw.bcs}`:""}`:""}</p>
-    ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}
+    ${moods.length?`<p class="small muted" style="margin-top:4px">Motivasjon sist: ${(MOODS.find(x=>x[0]===moods[moods.length-1])||[,""])[1].toLowerCase()}</p>`:""}
     ${warn.length?`<p class="small dogwarn">${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}
     ${(L=>L.lvl?`<p class="small ${L.lvl===2?"dogwarn":"warntext"}">${L.lvl===2?"Kraftig økning":"Økt belastning"} siste uke</p>`:"")(dogLoad(n))}</button>`;
 }
