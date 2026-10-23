@@ -307,8 +307,8 @@ function bind(){
     const email=document.getElementById("l-email").value.trim();
     if(!/.+@.+\..+/.test(email))return showErr("lErr",{message:"Skriv inn en gyldig e-postadresse."});
     send.disabled=true;
-    const r=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
-    if(r.error){send.disabled=false;return showErr("lErr",r.error)}
+    const r=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
+    if(r.error){send.disabled=false;return showErr("lErr",/signup|not allowed|not found/i.test(r.error.message||"")?{message:"Denne e-posten har ikke tilgang ennå. Appen er foreløpig bare for inviterte."}:r.error)}
     S.loginEmail=email;S.loginSent=true;render();
   };
   const back=document.getElementById("l-back");if(back)back.onclick=()=>{S.loginSent=false;render()};

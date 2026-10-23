@@ -23,3 +23,7 @@ Under **Hunder → Backup → Importer fil** velger du en backup-fil. Øktene fr
 ## Publisere på GitHub Pages
 
 Legg mappa i et GitHub-repo, og slå på Settings → Pages → *Deploy from a branch* → `main` / root.
+
+## Tilgang
+
+Registrering er stengt (Supabase → Authentication → Sign In / Providers → *Allow new users to sign up* er av). Nye brukere legges til under Authentication → Users → *Add user* → *Send invitation*. Hver bruker har sin egen logg.
