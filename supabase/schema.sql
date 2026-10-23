@@ -69,6 +69,8 @@ create policy "egne bilder slette" on storage.objects for delete to authenticate
 alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
 -- Forsidebilde på Oversikt (sti i bøtta «bilder»)
 alter table public.profiles add column if not exists cover text not null default '';
+-- Startlisens fra NHF: '' (ikke registrert), 'aars:<sesongstart-år>' eller 'engang'
+alter table public.profiles add column if not exists lisens text not null default '';
 
 -- Føremeldinger: deles med alle innloggede brukere. Bare den som skrev meldingen kan endre eller slette den.
 create table if not exists public.foremeldinger (

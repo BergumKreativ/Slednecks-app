@@ -4,6 +4,7 @@
 window.NHF_RULES_URL = "https://www.sleddog.no/p/71218/lover-og-regler";
 
 window.COMMON_RULES = [
+  "Alle norske deltakere må ha gyldig startlisens fra NHF fra dagen de fyller 13 år, enten årslisens eller engangslisens. Lisensen kjøpes i Min idrett. Lavterskelløp og treningsklasser er unntatt.",
   "Hunden må være minst 18 måneder på løpsdagen (12 måneder i miljøklasser).",
   "Alle hunder må ha avlesbar mikrochip. Chipnummer og dato skal stå i vaksinasjonsattesten.",
   "Gyldig vaksine mot valpesyke, parvovirus og smittsom leverbetennelse er påkrevd. Gyldig i 3 år for hunder over 1 år, med mindre annet er oppgitt.",
@@ -78,3 +79,16 @@ window.GRENER = [
 
 // Pulkvekt: hundenes vekt × faktor. Vekten inkluderer pulk, sele, drag og trekkreimer.
 window.PULK_FACTORS = {1:0.7, 2:0.7, 3:0.6, 4:0.5, 5:0.5};
+
+// Startlisens (NHF, sesongen 2026/2027). Kilde: sleddog.no/p/71252/lisensinformasjon
+window.LICENSE = {
+  buy: "https://www.minidrett.no/lisens/?sports=406",
+  info: "https://www.sleddog.no/p/71252/lisensinformasjon",
+  facts: [
+    "Årslisens over 17 år: 720 kr (13–17 år: 250 kr). Gjelder hele sesongen, 1. mai–30. april, og gir ulykkesforsikring for deg på både trening og løp.",
+    "For årslisens må du være medlem i en klubb tilknyttet NHF og ha bestått Ren utøver.",
+    "Engangslisens over 17 år: 325 kr (13–17 år: 100 kr). Gjelder i to dager, og du er ikke forsikret på trening.",
+    "NM krever årslisens og medlemskap i en norsk hundekjørerklubb.",
+    "Forsikringen gjelder deg, ikke hunden.",
+  ],
+};

@@ -58,6 +58,10 @@ function grenFor(p){
   return GREN(km>100?"slede-ld":"slede-md");
 }
 const grenClass=p=>String(p.raceType||"").split("|")[1]||"";
+// Startlisens: sesongen går fra 1. mai til 30. april. Lagres som "aars:<år sesongen starter>" eller "engang".
+const seasonYear=d=>d.getMonth()>=4?d.getFullYear():d.getFullYear()-1;
+const seasonLabel=y=>`${y}/${String(y+1).slice(2)}`;
+function licenseOk(){const l=S.profile.lisens||"";return l==="engang"||(l.startsWith("aars:")&&Number(l.slice(5))===seasonYear(parse(S.profile.raceDate)))}
 const planTypeFor=p=>p.planType&&TEMPLATES[p.planType]?p.planType:grenFor(p).plan;
 // PLAN[uke].d[dag] = [tekst, km, hm, nøkkeløkt, egen]
 let PLAN=[];
@@ -118,9 +122,9 @@ const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),r
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,lisens,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="velkommen";
@@ -128,7 +132,7 @@ async function loadAll(){
   S.sessions=ok(o).map(rowToSession);
   S.loaded=true;render();
 }
-const profileRow=p=>({race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
+const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
 async function refresh(){try{await loadAll()}catch(e){toast(errText(e))}}
 
 function planStart(){return addDays(monday(parse(S.profile.raceDate)),-70)}
@@ -390,7 +394,7 @@ function vHome(){
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `<div class="home">
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
-  <section class="hero">${hero}</section><p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
+  <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${progressCard(t)}
   ${trail(bw,t)}
   <section class="week">
@@ -935,6 +939,10 @@ function vSettings(){
   <div class="field" id="g-classWrap">${grenClassSelect(grenFor(p),grenClass(p))}</div>
   <div class="field"><label for="r-plan">Plantype</label><select id="r-plan"><option value="" id="r-planAuto">Automatisk (${esc(TEMPLATES[grenFor(p).plan].label.toLowerCase())})</option>${Object.entries(TEMPLATES).map(([k,t])=>`<option value="${k}" ${p.planType===k?"selected":""}>${t.label}</option>`).join("")}</select></div>
   <div id="g-info">${grenInfo(grenFor(p))}</div>
+  ${sh("flag","Startlisens","plan")}
+  <div class="field"><label for="r-lic">Din lisens for løpet</label><select id="r-lic">${[["","Ikke registrert"],[`aars:${seasonYear(parse(p.raceDate))}`,`Årslisens ${seasonLabel(seasonYear(parse(p.raceDate)))}`],["engang","Engangslisens til løpet"]].map(([v,t])=>`<option value="${v}" ${(p.lisens||"")===v?"selected":""}>${t}</option>`).join("")}</select></div>
+  <details class="rules"><summary>Om startlisens</summary><ul>${window.LICENSE.facts.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+   <p class="small"><a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp lisens i Min idrett</a> · <a href="${window.LICENSE.info}" target="_blank" rel="noopener">Les mer hos NHF</a></p></details>
   ${sh("paw-print","Hundene","dog")}
   <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
   <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
@@ -1197,7 +1205,7 @@ function bind(){
     if(!(raceKm>0))return showErr("setErr",{message:"Skriv inn distansen på løpet i km."});
     const pick=document.getElementById("r-pick").value, cls=document.getElementById("r-class");
     const prof={...S.profile,raceDate:document.getElementById("race").value||S.profile.raceDate,raceName:document.getElementById("r-name").value.trim(),raceKm,raceHm,
-      raceId:pick?pick+(cls&&cls.value?"|"+cls.value:""):"",raceType:document.getElementById("g-gren").value+(document.getElementById("g-class").value?"|"+document.getElementById("g-class").value:""),planType:document.getElementById("r-plan").value,dogs};
+      raceId:pick?pick+(cls&&cls.value?"|"+cls.value:""):"",raceType:document.getElementById("g-gren").value+(document.getElementById("g-class").value?"|"+document.getElementById("g-class").value:""),planType:document.getElementById("r-plan").value,lisens:document.getElementById("r-lic").value,dogs};
     ss.disabled=true;
     try{
       const ren={};rows.forEach(r=>{if(r.orig&&r.orig!==r.name)ren[r.orig]=r.name});
