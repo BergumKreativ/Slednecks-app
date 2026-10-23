@@ -115,9 +115,9 @@ const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),r
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="velkommen";
@@ -135,6 +135,7 @@ const weekTotals=i=>{const d=PLAN[i].d;return{km:d.reduce((a,x)=>a+x[1],0),hm:d.
 const byWeek=(list=dogS())=>{const m={};for(const s of list){const k=iso(monday(parse(s.dato)));(m[k]=m[k]||[]).push(s)}return m};
 
 function render(){
+  if(bigMap){bigMap.remove();bigMap=null}
   buildPlan();
   document.body.classList.toggle("anon",!S.user);
   document.querySelectorAll(".tab").forEach(t=>{if(t.dataset.v===S.view)t.setAttribute("aria-current","page");else t.removeAttribute("aria-current")});
@@ -142,7 +143,7 @@ function render(){
   if(!sb)app.innerHTML=vSetup();
   else if(!S.authReady)app.innerHTML=`<p class="empty">Laster …</p>`;
   else if(!S.user)app.innerHTML=S.view==="personvern"?vPrivacy():vLogin();
-  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings,hund:vDog,velkommen:vWelcome,personvern:vPrivacy})[S.view]()+footer();
+  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings,hund:vDog,velkommen:vWelcome,personvern:vPrivacy,kart:vMap})[S.view]()+footer();
   bind();
 }
 
@@ -164,7 +165,7 @@ function vLogin(){
 
 /* Testversjon: versjonsnummer, bunntekst, tilbakemelding, velkomst og personvern */
 const APP_VERSION=window.APP_VERSION||"dev";
-const VIEW_NAMES={hjem:"Oversikt",logg:"Logg",plan:"Plan",innst:"Profil",hund:"Hundeside",velkommen:"Velkommen",personvern:"Personvern"};
+const VIEW_NAMES={hjem:"Oversikt",logg:"Logg",plan:"Plan",innst:"Profil",hund:"Hundeside",velkommen:"Velkommen",personvern:"Personvern",kart:"Kart"};
 function footer(){
   return `<p class="foot small muted"><button type="button" class="linkbtn" id="fbOpen">Gi tilbakemelding</button> · <button type="button" class="linkbtn" data-goto="velkommen">Kom i gang</button> · <button type="button" class="linkbtn" data-goto="personvern">Personvern</button><br>Testversjon ${esc(APP_VERSION)}</p>`;
 }
@@ -213,9 +214,11 @@ function vPrivacy(){
   <h3>Hva vi lagrer</h3><ul>
    <li>E-postadressen din, for å logge deg inn.</li>
    <li>Det du fører inn: økter, mål, treningsplan, løp, hunder og hundeinfo (som vekt, chip-ID og vaksiner).</li>
+   <li>Føremeldinger du publiserer for andre brukere.</li>
    <li>Tilbakemeldinger du sender, med hvilken side du var på, versjon og type enhet og nettleser.</li></ul>
   <p>Vi samler ikke inn noe annet, og bruker ikke sporing, reklame eller analyseverktøy.</p>
   <h3>Hvor dataene ligger</h3><p>Dataene lagres hos Supabase, på servere i EU (Irland). Bare du har tilgang til dine egne data i appen. Den ansvarlige kan se dem i databasen ved behov for feilretting og drift.</p>
+  <h3>Føremeldinger</h3><p>Føremeldinger du publiserer (sted på kartet, føre, kommentar og visningsnavnet ditt hvis du har satt et) vises for alle innloggede brukere i 14 dager. E-postadressen din vises aldri. Du kan slette dine egne meldinger når som helst.</p>
   <h3>Posisjon og vær</h3><p>Viser du været, spør appen om posisjonen din. Den lagres bare på din enhet, og sendes avrundet (omtrent 100 meter) til Meteorologisk institutt (MET Norway) for å hente værvarselet.</p>
   <h3>Andre tjenester</h3><p>Appen ligger på GitHub Pages, og bruker skrifttyper fra Google Fonts og programkode fra jsDelivr. Disse tjenestene ser IP-adressen din når appen lastes, slik det er for nettsider flest.</p>
   <h3>Hvorfor</h3><p>Vi behandler opplysningene for å gi deg tjenesten du har bedt om (personvernforordningen artikkel 6 nr. 1 bokstav b), og tilbakemeldinger for å forbedre appen.</p>
@@ -227,6 +230,113 @@ function goalRow(label,done,goal,fmt,unit){
   const pct=goal?Math.min(100,done/goal*100):0;
   return `<div class="goalrow"><div class="row"><span><span class="v">${fmt(done)}</span> <span class="of muted">av ${fmt(goal)} ${unit}</span></span><span class="small ${pct>=100?"badge-ok":"muted"}">${pct>=100?"Nådd ✓":Math.round(pct)+" %"}</span></div>
   <div class="bar" role="img" aria-label="${label}: ${Math.round(pct)} prosent"><span style="width:${pct}%"></span></div><p class="small muted" style="margin-top:3px">${label}</p></div>`;
+}
+
+/* Føremeldinger fra brukerne og skiløyper fra Kartverket (Turrutebasen, åpne data via WFS) */
+const FORE=["Nysnø","Pakket","Nypreparert","Skare","Isete","Slaps","Lite snø","Barmark / gjørme"];
+const LOYPE=["Hundeløype","Skiløype","Sti / vei","Fjell / åpent"];
+const REP={list:[],at:0,loading:false};
+let bigMap=null, trailLayer=null, pickMarker=null;
+const TRAIL_CACHE={};
+async function loadReports(force){
+  if(REP.loading||(!force&&Date.now()-REP.at<5*60e3))return;
+  REP.loading=true;
+  try{REP.list=ok(await sb.from("foremeldinger").select("*").gte("created_at",new Date(Date.now()-14*864e5).toISOString()).order("created_at",{ascending:false}).limit(500));REP.at=Date.now()}
+  catch(e){REP.at=Date.now()}
+  REP.loading=false;
+  if(S.view==="hjem"||S.view==="kart")render();
+}
+function ago(t){
+  const m=Math.round((Date.now()-new Date(t))/60000);
+  if(m<60)return m<=1?"nå nettopp":`for ${m} min siden`;
+  const h=Math.round(m/60);if(h<24)return `for ${h} ${h===1?"time":"timer"} siden`;
+  const d=Math.round(h/24);return `for ${d} ${d===1?"dag":"dager"} siden`;
+}
+const ageClass=t=>{const h=(Date.now()-new Date(t))/36e5;return h<=24?"fresh":h<=72?"recent":"old"};
+function kmBetween(a,b){const r=x=>x*Math.PI/180,dLat=r(b.lat-a.lat),dLon=r(b.lon-a.lon);const h=Math.sin(dLat/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLon/2)**2;return 12742*Math.asin(Math.sqrt(h))}
+function reportHtml(r,withDel){
+  return `<div class="rep"><div class="row"><b>${esc(r.fore||"Føremelding")}</b><span class="small muted">${ago(r.created_at)}</span></div>
+   <p class="small">${[r.loype,r.sted].filter(Boolean).map(esc).join(" · ")}${r.kjort?` · <b>nylig kjørt/preparert</b>`:""}</p>
+   ${r.tekst?`<p class="small">${esc(r.tekst)}</p>`:""}
+   <p class="small muted">– ${esc(r.navn||"Anonym")}${withDel&&r.user_id===S.user.id?` · <button type="button" class="linkbtn" data-delrep="${esc(r.id)}">Slett</button>`:""}</p></div>`;
+}
+function foreCard(){
+  if(!REP.at){loadReports();return `<p class="small muted center">Henter føremeldinger …</p>`}
+  const pos=savedPos(), near=pos?REP.list.filter(r=>kmBetween(pos,r)<=50):REP.list, recent=near.filter(r=>Date.now()-new Date(r.created_at)<3*864e5);
+  return `<div class="wx">${recent.length?`<p><b>${recent.length} ${recent.length===1?"melding":"meldinger"}</b> ${pos?"innen 50 km":"i hele landet"} siste 3 dager</p>${reportHtml(recent[0],false)}`:`<p class="small muted">Ingen føremeldinger ${pos?"i nærheten":""} siste 3 dager. Vær den første til å melde om føret!</p>`}
+   <div class="actions"><button type="button" class="btn line" data-goto="kart">Åpne kartet</button></div></div>`;
+}
+function vMap(){
+  return `<h2 style="margin-top:6px">Føre og løyper</h2>
+  <p class="muted small">Trykk på kartet for å velge sted, og meld om føret. Meldingene vises for alle brukere i 14 dager.</p>
+  <div id="bigmap" class="map big" role="application" aria-label="Kart med løyper og føremeldinger"></div>
+  <div class="legend" style="margin-top:8px"><span><b style="background:var(--good)"></b>Siste døgn</span><span><b style="background:var(--warn)"></b>1–3 dager</span><span><b style="background:var(--muted)"></b>Eldre</span><span><b style="background:#1f6feb"></b>Skiløype</span></div>
+  <label class="small" style="display:block;margin-top:6px"><input type="checkbox" id="trailToggle" ${S.trails!==false?"checked":""} style="width:auto;margin-right:6px">Vis skiløyper fra Kartverket (zoom inn)</label>
+  <div class="actions"><button class="btn" id="reportHere">Meld føre her</button><button class="btn line" id="mapMe">Der jeg er</button></div>
+  <p class="small muted" id="mapHint" style="margin-top:6px"></p>
+  <h3 style="margin-top:18px">Meldinger i kartutsnittet</h3><div id="repList" class="list"></div>
+  <p class="small muted" style="margin-top:14px">Løyper: © Kartverket (Turrutebasen). Ikke alle løyper er med, og hundeløyper mangler de fleste steder. Meld gjerne om løyper du kjenner. Løypestatus fra Sporet og Hundesporet er ikke med ennå.</p>`;
+}
+async function loadTrails(){
+  if(!bigMap||S.trails===false||bigMap.getZoom()<11){if(trailLayer)trailLayer.clearLayers();document.getElementById("mapHint")&&(document.getElementById("mapHint").textContent=S.trails!==false&&bigMap&&bigMap.getZoom()<11?"Zoom inn for å se skiløyper.":"");return}
+  const b=bigMap.getBounds(), q=v=>Math.round(v*20)/20, key=[q(b.getSouth()),q(b.getWest()),q(b.getNorth()),q(b.getEast())].join(",");
+  let lines=TRAIL_CACHE[key];
+  if(!lines){
+    try{
+      const url=`https://wfs.geonorge.no/skwms1/wfs.turogfriluftsruter?service=WFS&version=2.0.0&request=GetFeature&typeNames=app:Skil%C3%B8ype&count=400&bbox=${key},urn:ogc:def:crs:EPSG::4258`;
+      const xml=new DOMParser().parseFromString(await (await fetch(url)).text(),"application/xml");
+      lines=[...xml.getElementsByTagName("app:Skiløype")].map(f=>{
+        const t=n=>(f.getElementsByTagName(n)[0]||{}).textContent||"";
+        const parts=[...f.getElementsByTagName("gml:posList")].map(pl=>{const v=pl.textContent.trim().split(/\s+/).map(Number),o=[];for(let i=0;i+1<v.length;i+=2)o.push([v[i],v[i+1]]);return o});
+        return{name:t("app:rutenavn"),prep:t("app:preparering"),who:t("app:vedlikeholdsansvarlig"),parts};
+      });
+      TRAIL_CACHE[key]=lines;
+    }catch(e){lines=[]}
+  }
+  if(!bigMap)return;
+  trailLayer.clearLayers();
+  const PREP={PM:"maskinpreparert",PS:"preparert med scooter",U:"upreparert"};
+  for(const l of lines)for(const part of l.parts)L.polyline(part,{color:"#1f6feb",weight:3,opacity:.8}).addTo(trailLayer).bindPopup(`<b>${esc(l.name||"Skiløype")}</b>${l.prep?`<br>${esc(PREP[l.prep]||l.prep)}`:""}${l.who?`<br><span class="small">${esc(l.who)}</span>`:""}`);
+  const h=document.getElementById("mapHint");if(h)h.textContent=lines.length?`${lines.length} skiløyper i utsnittet.`:"Ingen skiløyper fra Kartverket her.";
+}
+function bindMap(){
+  const el=document.getElementById("bigmap");if(!el||!window.L)return;
+  const pos=savedPos();
+  bigMap=L.map(el,{scrollWheelZoom:true}).setView(pos?[pos.lat,pos.lon]:[61.5,10.5],pos?11:5);
+  L.tileLayer(KARTVERKET,{maxZoom:18,attribution:'© <a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a>'}).addTo(bigMap);
+  trailLayer=L.layerGroup().addTo(bigMap);
+  const col={fresh:"#2E8B57",recent:"#D99A00",old:"#888"};
+  for(const r of REP.list)L.circleMarker([r.lat,r.lon],{radius:8,color:"#fff",weight:2,fillColor:col[ageClass(r.created_at)],fillOpacity:1}).addTo(bigMap).bindPopup(reportHtml(r,true));
+  bigMap.on("popupopen",e=>{const b=e.popup.getElement().querySelector("[data-delrep]");if(b)b.onclick=()=>delReport(b.dataset.delrep)});
+  bigMap.on("click",e=>{if(pickMarker)pickMarker.remove();pickMarker=L.marker(e.latlng).addTo(bigMap);document.getElementById("reportHere").textContent="Meld føre ved markøren"});
+  const list=()=>{const b=bigMap.getBounds(),inView=REP.list.filter(r=>b.contains([r.lat,r.lon])).slice(0,30);const el=document.getElementById("repList");if(el){el.innerHTML=inView.length?inView.map(r=>reportHtml(r,true)).join(""):`<p class="small muted">Ingen meldinger her siste 14 dager.</p>`;el.querySelectorAll("[data-delrep]").forEach(b=>b.onclick=()=>delReport(b.dataset.delrep))}};
+  let t=null;bigMap.on("moveend",()=>{list();clearTimeout(t);t=setTimeout(loadTrails,400)});
+  setTimeout(()=>{bigMap&&bigMap.invalidateSize();list();loadTrails()},50);
+  document.getElementById("trailToggle").onchange=e=>{S.trails=e.target.checked;loadTrails()};
+  document.getElementById("reportHere").onclick=()=>{const c=pickMarker?pickMarker.getLatLng():bigMap.getCenter();openReport(c.lat,c.lng)};
+  document.getElementById("mapMe").onclick=()=>{if(!navigator.geolocation)return;navigator.geolocation.getCurrentPosition(p=>{try{localStorage.setItem("sn-pos",JSON.stringify({lat:p.coords.latitude,lon:p.coords.longitude}))}catch(e){}if(bigMap)bigMap.setView([p.coords.latitude,p.coords.longitude],13)},()=>toast("Fikk ikke tilgang til posisjonen"))};
+}
+async function delReport(id){if(!confirm("Slette føremeldingen?"))return;try{ok(await sb.from("foremeldinger").delete().eq("id",id));toast("Meldingen er slettet");await loadReports(true)}catch(e){toast(errText(e))}}
+function openReport(lat,lon){
+  const V={fore:"",loype:"Hundeløype",kjort:false};
+  const draw=()=>{panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Meld føre</h2><button class="btn ghost" id="rpClose">Lukk</button></div>
+  <p class="small muted" style="margin-top:6px">Meldingen vises for alle brukere i 14 dager${S.profile.nickname?`, signert «${esc(S.profile.nickname)}»`:", uten navn (du kan sette et visningsnavn under Profil)"}.</p>
+  <div class="field"><label for="rp-sted">Sted</label><input id="rp-sted" maxlength="60" placeholder="F.eks. Sjusjøen, hundeløypa mot Elgåsen" value="${esc(V.sted||"")}"></div>
+  <div class="field"><span class="flabel">Løype</span><div class="chips">${LOYPE.map(x=>`<button type="button" class="chip" data-rl="${x}" aria-pressed="${V.loype===x}">${x}</button>`).join("")}</div></div>
+  <div class="field"><span class="flabel">Føre</span><div class="chips">${FORE.map(x=>`<button type="button" class="chip" data-rf="${x}" aria-pressed="${V.fore===x}">${x}</button>`).join("")}</div></div>
+  <div class="field"><label><input type="checkbox" id="rp-kjort" ${V.kjort?"checked":""} style="width:auto;margin-right:8px">Løypa er nylig kjørt eller preparert</label></div>
+  <div class="field"><label for="rp-txt">Kommentar</label><textarea id="rp-txt" maxlength="400" placeholder="Snødybde, is på vann, beitedyr, vindfall …">${esc(V.tekst||"")}</textarea></div>
+  <p class="err" id="rpErr" hidden></p><div class="actions"><button class="btn" id="rpSend">Publiser melding</button></div>`;
+  const keep=()=>{V.sted=panel.querySelector("#rp-sted").value;V.tekst=panel.querySelector("#rp-txt").value;V.kjort=panel.querySelector("#rp-kjort").checked};
+  panel.querySelector("#rpClose").onclick=closeForm;
+  panel.querySelectorAll("[data-rl]").forEach(b=>b.onclick=()=>{keep();V.loype=b.dataset.rl;draw()});
+  panel.querySelectorAll("[data-rf]").forEach(b=>b.onclick=()=>{keep();V.fore=b.dataset.rf;draw()});
+  panel.querySelector("#rpSend").onclick=async()=>{keep();
+    if(!V.fore)return showErr("rpErr",{message:"Velg hvordan føret er."});
+    const btn=panel.querySelector("#rpSend");btn.disabled=true;
+    try{ok(await sb.from("foremeldinger").insert({lat,lon,sted:V.sted.trim(),loype:V.loype,fore:V.fore,kjort:V.kjort,tekst:V.tekst.trim(),navn:S.profile.nickname||""}));closeForm();if(pickMarker){pickMarker.remove();pickMarker=null}toast("Takk! Meldingen er publisert");await loadReports(true)}
+    catch(e){btn.disabled=false;showErr("rpErr",e)}};};
+  draw();sheet.classList.add("open");
 }
 
 /* Bilder lagres privat i Supabase Storage (bøtta «bilder») under <bruker-id>/… og vises med lenker som varer en time.
@@ -288,6 +398,8 @@ function vHome(){
       <div><p class="lab muted">Neste langtur</p><p class="what">${next?`${DAYS[(next.d.getDay()+6)%7]} ${fmtD(next.d)}: ${esc(next.txt.replace(/^❄ /,""))}`:"–"}</p></div>
     </div>
   </section>
+  <h2>Føre og løyper</h2>
+  ${foreCard()}
   <h2>Vær og varme</h2>
   ${weatherCard()}
   <h2>Hundene</h2>
@@ -814,6 +926,7 @@ function vSettings(){
   <p class="err" id="impErr" hidden></p>
   <h2>Konto</h2>
   <p class="muted">Innlogget som ${esc(S.user?.email||"")}</p>
+  <div class="field"><label for="nick">Visningsnavn på føremeldinger</label><div class="row" style="align-items:center"><input id="nick" maxlength="30" value="${esc(p.nickname||"")}" placeholder="Valgfritt, ellers «Anonym»"><button type="button" class="btn ghost" id="nickSave">Lagre</button></div></div>
   <div class="actions"><button class="btn ghost" id="logoutBtn">Logg ut</button></div>
   <details class="rules" style="margin-top:18px"><summary>Slett kontoen min</summary>
    <p class="small">Dette sletter profilen, hundene, planen og alle øktene dine for godt. Last ned en backup først hvis du vil ta vare på noe.</p>
@@ -1012,6 +1125,8 @@ async function importData(file){
 }
 
 function bind(){
+  const ns=document.getElementById("nickSave");if(ns)ns.onclick=async()=>{const v=document.getElementById("nick").value.trim();try{ok(await sb.from("profiles").update({nickname:v}).eq("user_id",S.user.id));S.profile.nickname=v;toast("Lagret")}catch(e){toast(errText(e))}};
+  if(S.view==="kart"&&S.user){if(!REP.at)loadReports();bindMap()}
   loadImgs();
   const cb=document.getElementById("coverBtn"),cf=document.getElementById("coverFile");
   if(cb){cb.onclick=()=>cf.click();cf.onchange=async()=>{const f=cf.files[0];if(!f)return;toast("Laster opp …");

@@ -70,6 +70,29 @@ alter table public.profiles add column if not exists my_goals jsonb not null def
 -- Forsidebilde på Oversikt (sti i bøtta «bilder»)
 alter table public.profiles add column if not exists cover text not null default '';
 
+-- Føremeldinger: deles med alle innloggede brukere. Bare den som skrev meldingen kan endre eller slette den.
+create table if not exists public.foremeldinger (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade default auth.uid(),
+  created_at timestamptz not null default now(),
+  lat        double precision not null,
+  lon        double precision not null,
+  sted       text not null default '',
+  loype      text not null default '',
+  fore       text not null default '',
+  kjort      boolean not null default false,
+  tekst      text not null default '',
+  navn       text not null default ''
+);
+create index if not exists foremeldinger_tid on public.foremeldinger (created_at desc);
+alter table public.foremeldinger enable row level security;
+drop policy if exists "alle innloggede ser føremeldinger" on public.foremeldinger;
+create policy "alle innloggede ser føremeldinger" on public.foremeldinger for select to authenticated using (true);
+drop policy if exists "egne føremeldinger" on public.foremeldinger;
+create policy "egne føremeldinger" on public.foremeldinger for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- Navnet som vises på føremeldinger (valgfritt)
+alter table public.profiles add column if not exists nickname text not null default '';
+
 -- Tilbakemeldinger fra testbrukere. Leses i Supabase → Table Editor. Blir liggende uten bruker-ID hvis kontoen slettes.
 create table if not exists public.tilbakemeldinger (
   id         uuid primary key default gen_random_uuid(),

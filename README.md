@@ -52,3 +52,9 @@ Vær hentes fra MET Norway (api.met.no, CC BY 4.0) for posisjonen til nettlesere
 ## E-post (SMTP)
 
 Supabase sender bare til medlemmer av prosjektteamet uten egen SMTP. Oppsett med Resend: lag konto på resend.com, legg til og bekreft domenet (DNS-poster hos domeneleverandøren), og koble til Supabase (Resend → Integrations → Supabase, eller Supabase → Authentication → Emails → SMTP Settings med host `smtp.resend.com`, port 465, bruker `resend`, passord = API-nøkkel).
+
+## Føre og løyper
+
+- Føremeldinger (`foremeldinger`) deles med alle innloggede brukere i 14 dager. Moderering: slett rader i Supabase → Table Editor.
+- Skiløyper hentes direkte fra Kartverkets Turrutebase (WFS `wfs.geonorge.no/skwms1/wfs.turogfriluftsruter`, typen `app:Skiløype`, bbox i lat,lon) når man zoomer inn.
+- Løypestatus fra Sporet (Skiforeningen/Swix) og Løyper.net/Hundesporet (FMS Nordic) har ikke åpne API-er og krever avtale.
