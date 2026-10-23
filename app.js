@@ -110,10 +110,33 @@ function wxSeason(){
   try{const v=JSON.parse(localStorage.getItem("sn-wxseason")||"null");if(v&&Date.now()-v.at<864e5)return v}catch(e){}
   return null;
 }
+// Fokus for sesongen (flere valg): styrer hvilke økttyper og hvilket innhold som vises. Tomt valg viser alt.
+const FOCUS={
+  slede:{label:"Hundekjøring med slede",dog:["Hundekjøring","Sykkeljøring","Vogn / ATV","Sparkesykkel","Gåtur","Kjettingtrekk"],race:true},
+  nordisk:{label:"Pulk og skijøring",dog:["Pulk","Skijøring","Canicross","Sykkeljøring","Gåtur","Kjettingtrekk"],race:true},
+  barmark:{label:"Canicross, sykkel og sparkesykkel",dog:["Canicross","Sykkeljøring","Sparkesykkel","Gåtur"],race:true},
+  tur:{label:"Turer og kløv",dog:["Gåtur","Kløvtur","Kløvtrening","Skijøring","Canicross"]},
+  meg:{label:"Min egen form"},
+};
+const focus=()=>(S.profile.focus||[]).filter(k=>FOCUS[k]);
+const hasFocus=k=>!focus().length||focus().includes(k);
+const competes=()=>!focus().length||focus().some(k=>FOCUS[k].race);
+const focusDogTypes=()=>{const f=focus().filter(k=>FOCUS[k].dog);return f.length?[...new Set(f.flatMap(k=>FOCUS[k].dog).concat("Annet"))]:null};
+const focusChips=()=>`<div class="chips">${Object.entries(FOCUS).map(([k,f])=>`<button type="button" class="chip" data-focus="${k}" aria-pressed="${focus().includes(k)}">${esc(f.label)}</button>`).join("")}</div>`;
+async function toggleFocus(k){
+  const cur=focus(),next=cur.includes(k)?cur.filter(x=>x!==k):[...cur,k];
+  S.profile.focus=next;render();
+  try{ok(await sb.from("profiles").update({focus:next,updated_at:new Date().toISOString()}).eq("user_id",S.user.id))}catch(e){toast(errText(e))}
+}
 const autoSeason=()=>{const w=wxSeason();if(w&&w.k)return w.k;const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":"barmark"};
 const seasonPick=()=>{try{const v=localStorage.getItem("sn-season")||"";return v==="host"||v==="sommer"?"barmark":v}catch(e){return ""}};
 const season=()=>{const v=seasonPick()||autoSeason();return v==="alle"?null:v};
-const seasonTypes=kat=>{const k=season();return k?SEASONS[k][kat==="meg"?"me":"dog"]:(kat==="meg"?MY_TYPES:TYPES)};
+const seasonTypes=kat=>{
+  const k=season(),base=k?SEASONS[k][kat==="meg"?"me":"dog"]:(kat==="meg"?MY_TYPES:TYPES),f=kat==="meg"?null:focusDogTypes();
+  if(!f)return base;
+  const both=base.filter(t=>f.includes(t));
+  return both.filter(t=>t!=="Annet").length?both:base;
+};
 const inSeason=x=>{const k=season();return !k||SEASONS[k][isMe(x)?"me":"dog"].includes(typeOf(x.type,x.kategori))};
 function seasonBar(){
   const pick=seasonPick(),cur=pick||autoSeason(),w=wxSeason();
@@ -171,7 +194,7 @@ async function loadAll(){
   }
   const [p,o]=await Promise.all([sb.from("profiles").select("*").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",races:Array.isArray(prof.races)?prof.races:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",focus:Array.isArray(prof.focus)?prof.focus:[],races:Array.isArray(prof.races)?prof.races:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="velkommen";
@@ -285,6 +308,9 @@ function vWelcome(){
   <p class="notice">Dette er en <b>testversjon</b>. Takk for at du er med og gjør appen bedre! Ting kan endre seg underveis.</p>
   <h2 style="margin-top:22px">Kom i gang</h2>
   <div class="kig">
+   <div class="kcard"><h3>${icon("target","sm")} Hva trener du mot denne sesongen?</h3>
+    <p class="small">Velg det som passer, så viser appen bare det som er relevant for deg. Du kan endre det under Profil.</p>
+    <div style="margin-top:8px">${focusChips()}</div></div>
    <div class="kcard"><h3>${icon("route","sm")} Hent inn treningen din</h3>
     <p class="small">Har du trent allerede denne sesongen? Hent inn øktene fra Strava, klokka eller Tractive, så er loggen og planen oppdatert fra start.</p>
     ${S.sessions.length?`<p class="small"><b>✓ ${S.sessions.length} økter i loggen</b></p>`:""}
@@ -292,7 +318,7 @@ function vWelcome(){
    <div class="kcard"><h3>${icon("paw-print","sm")} Målet for hunden</h3>
     <p class="small">Trener dere mot et løp, et kløvmerke eller bare gode turer og god form?</p>
     ${S.profile.raceName?`<p class="small"><b>✓ ${esc(S.profile.raceName)}</b> ${esc(fmtD(parse(S.profile.raceDate)))}</p>`:""}
-    <div class="actions" style="margin-top:8px;flex-wrap:wrap"><button type="button" class="btn line sm" data-goto="innst">Velg løp eller eget mål</button>${S.profile.dogs.length?`<button type="button" class="btn ghost sm" data-dogpage="${esc(S.profile.dogs[0])}">Kløvmerke</button>`:""}</div>
+    <div class="actions" style="margin-top:8px;flex-wrap:wrap">${competes()?`<button type="button" class="btn line sm" data-goto="innst">Velg løp eller eget mål</button>`:""}${S.profile.dogs.length&&hasFocus("tur")?`<button type="button" class="btn ghost sm" data-dogpage="${esc(S.profile.dogs[0])}">Kløvmerke</button>`:""}</div>
     <p class="small muted" style="margin-top:6px">Bare turer og form? Da holder det å føre øktene. Ukene og belastningen følges opp på Oversikt.</p></div>
    <div class="kcard"><h3>${icon("person-standing","sm")} Målet ditt</h3>
     <p class="small">Hva vil du klare selv? For eksempel Galdhøpiggen med 12 kg sekk, eller 10 km løping på under timen.</p>
@@ -503,10 +529,10 @@ function vHome(){
   return `<div class="home">
   ${seasonBar()}
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
-  <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
-  ${upcomingRaces()}
+  ${competes()?`<section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>`:""}
+  ${competes()?upcomingRaces():""}
   ${wxTop()}
-  ${progressCard(t)}
+  ${competes()?progressCard(t):""}
   ${S.loaded&&!S.sessions.length?`<p class="notice center" style="margin-top:12px">${icon("route","sm")} Har du trent allerede denne sesongen? <button type="button" class="linkbtn" id="hmImport">Hent inn øktene dine</button></p>`:""}
   ${trackCard()}
   ${trail(bw,t)}
@@ -524,8 +550,8 @@ function vHome(){
   ${weatherCard()}`}
   ${sh("paw-print","Hundene","dog")}
   ${S.profile.dogs.length?`<div class="dogs t-dog">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
-  <div class="row center" style="margin-top:28px">${sh("person-standing","Deg","me","margin:0")}<button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
-  ${meCard(t)}
+  ${hasFocus("meg")?`<div class="row center" style="margin-top:28px">${sh("person-standing","Deg","me","margin:0")}<button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
+    ${meCard(t)}`:""}
   ${sh("trending-up","Uke for uke","plan")}
   ${chart(bw)}</div>`;
 }
@@ -941,7 +967,7 @@ function vDog(){
   ${loadBox(dogLoad(n),v=>fmtKm(v)+" km")||`<p class="muted small">Logg noen økter, så ser du hvordan belastningen utvikler seg.</p>`}
   <div class="field"><label for="i-tol">Hvor mye tåler ${esc(n)} av økning?</label><select id="i-tol">${Object.entries(TOLERANCE).map(([k,v])=>`<option value="${k}" ${(i.tolerance||"normal")===k?"selected":""}>${v.t} – varsel ved ${Math.round((v.warn-1)*100)} % økning</option>`).join("")}</select></div>
   <p class="small muted" style="margin-top:6px">Sammenligner km siste 7 dager med snittet av de 4 ukene før. Veiledende: rase, alder, form og underlag gjør at hunder tåler ulikt. Velg «lav» for unge, eldre eller hunder som kommer tilbake etter skade.</p>
-  ${packSection(n)}
+  ${hasFocus("tur")?packSection(n):""}
 
   ${sh("syringe","Vaksinekort","health")}
   ${vs.length?`<div class="list">${vs.map(v=>{const st=vaccineStatus(v);return `<div class="lrow"><span><b>${esc(vacName(v.type))}</b><br><span class="small muted">Gitt ${parse(v.d).toLocaleDateString("nb-NO")}${v.note?` · ${esc(v.note)}`:""}</span></span><span class="pill ${st.c}">${esc(st.t)}</span><button type="button" class="btn ghost sm" data-vdel="${esc(v.id)}" aria-label="Slett vaksine">Slett</button></div>`}).join("")}</div>`:`<p class="muted">Ingen vaksiner registrert.</p>`}
@@ -1121,10 +1147,14 @@ const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:ce
 function vSettings(){
   const p=S.profile;
   return `${S.isNew?`<p class="notice" style="margin-top:6px"><b>Velkommen!</b> Sett opp løpet du trener mot og hundene dine, så lages en plan for deg.</p>`:""}
-  ${sh("image","Forsidebilde","me","margin-top:6px")}
+  ${sh("target","Fokus for sesongen","plan","margin-top:6px")}
+  <p class="muted">Hva trener du mot? Appen viser bare økttyper og innhold som passer. Velg så mange du vil.</p>
+  ${focusChips()}
+  ${sh("image","Forsidebilde","me")}
   <p class="muted">Et bilde av deg og hundene øverst på Oversikt.</p>
   ${p.cover?`<div class="cover small">${imgTag(p.cover,"","Forsidebilde")}</div>`:""}
   <div class="actions"><button type="button" class="btn line" id="coverBtn">${p.cover?"Bytt bilde":"Velg bilde"}</button>${p.cover?`<button type="button" class="btn ghost" id="coverRm">Fjern</button>`:""}</div><input type="file" id="coverFile" accept="image/*" hidden>
+  <div ${competes()?"":"hidden"}>
   ${sh("flag","Målet ditt","plan")}
   <p class="muted">Hovedløpet ditt. Velg et løp fra kalenderen, eller fyll inn ditt eget. Treningsplanen på ${PLAN_WEEKS} uker lages ut fra dette løpet.</p>
   <div class="field"><label for="r-pick">Løp</label><select id="r-pick">${raceOptions(p.raceId)}</select></div>
@@ -1149,6 +1179,7 @@ function vSettings(){
   <div class="field"><label for="r-lic">Din lisens for løpet</label><select id="r-lic">${[["","Ikke registrert"],[`aars:${seasonYear(parse(p.raceDate))}`,`Årslisens ${seasonLabel(seasonYear(parse(p.raceDate)))}`],["engang","Engangslisens til løpet"]].map(([v,t])=>`<option value="${v}" ${(p.lisens||"")===v?"selected":""}>${t}</option>`).join("")}</select></div>
   <details class="rules"><summary>Om startlisens</summary><ul>${window.LICENSE.facts.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
    <p class="small"><a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp lisens i Min idrett</a> · <a href="${window.LICENSE.info}" target="_blank" rel="noopener">Les mer hos NHF</a></p></details>
+  </div>
   ${sh("paw-print","Hundene","dog")}
   <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
   <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
@@ -1628,6 +1659,7 @@ function bind(){
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
+  document.querySelectorAll("[data-focus]").forEach(b=>b.onclick=()=>toggleFocus(b.dataset.focus));
   document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});
   document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const k=b.dataset.season;try{k==="auto"||k===autoSeason()?localStorage.removeItem("sn-season"):localStorage.setItem("sn-season",k)}catch(e){}render()});
   document.querySelectorAll("[data-dogpage]").forEach(b=>b.onclick=()=>{S.dog=b.dataset.dogpage;S.view="hund";render();window.scrollTo(0,0)});

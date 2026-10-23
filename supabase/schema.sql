@@ -161,3 +161,6 @@ begin
 end $$;
 drop trigger if exists check_invite_code on auth.users;
 create trigger check_invite_code before insert on auth.users for each row execute function public.check_invite_code();
+
+-- Fokus for sesongen: ["slede","nordisk","barmark","tur","meg"]. Tom liste viser alt.
+alter table public.profiles add column if not exists focus jsonb not null default '[]'::jsonb;
