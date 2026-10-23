@@ -2006,7 +2006,25 @@ function bind(){
   const lo=document.getElementById("logoutBtn");if(lo)lo.onclick=async()=>{await sb.auth.signOut()};
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{S.view=t.dataset.v;try{history.replaceState(null,"","#"+S.view)}catch(e){}render();window.scrollTo(0,0)});
-document.getElementById("addBtn").onclick=()=>openForm();
+// Plusstegnet: start GPS-tur med én gang, eller legg inn økta manuelt
+function openAdd(){
+  const t=trkLoad(),live=t&&!t.done;
+  panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Ny økt</h2><button class="btn ghost" id="adClose">Lukk</button></div>
+   <div class="addmenu">
+    <button type="button" class="btn big" id="adGps">${icon(live?"route":"play")} ${live?"Fortsett turen":"Start tur med GPS"}</button>
+    ${t&&t.done?`<button type="button" class="btn line" id="adSaveTrk">${icon("route","sm")} Lagre sporet tur (${fmtKm(t.m/1000)} km)</button>`:""}
+    <button type="button" class="btn line" id="adManual">${icon("list","sm")} Legg inn økt manuelt</button>
+    <button type="button" class="btn ghost" id="adImport">${icon("route","sm")} Importer fra Strava, klokke eller Tractive</button>
+   </div>`;
+  const $=id=>panel.querySelector("#"+id);
+  $("adClose").onclick=closeForm;
+  $("adGps").onclick=()=>{closeForm();openTrack()};
+  $("adManual").onclick=()=>openForm();
+  $("adImport").onclick=openImport;
+  if($("adSaveTrk"))$("adSaveTrk").onclick=()=>saveTrack();
+  sheet.classList.add("open");
+}
+document.getElementById("addBtn").onclick=()=>openAdd();
 sheet.addEventListener("click",e=>{if(e.target===sheet)closeForm()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeForm()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh();if(!document.hidden&&trkWatch!=null)trkWake()});

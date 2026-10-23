@@ -457,3 +457,7 @@ body.th-vinter{--grad:linear-gradient(135deg,#0A1A3F 0%,#173E7A 42%,#1B7F95 74%,
 .sudots{display:flex;gap:6px}
 .sudots i{width:22px;height:4px;border-radius:2px;background:var(--line)}
 .sudots i.on{background:var(--grad-btn)}
+/* Valg bak plusstegnet */
+.addmenu{display:grid;gap:10px;margin-top:14px}
+.addmenu .btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.addmenu .btn.big{padding:20px 18px;font-size:1.2rem}
