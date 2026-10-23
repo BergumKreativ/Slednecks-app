@@ -133,3 +133,31 @@ create policy "egne økter" on public.okter
 
 -- Flere løp i sesongen: [{ id, raceId, name, date, km, hm }]. Hovedløpet ligger i race_*-kolonnene.
 alter table public.profiles add column if not exists races jsonb not null default '[]'::jsonb;
+
+-- Invitasjonskoder: testere lager konto selv med e-post, passord og en kode. Kodene leses bare her i databasen.
+-- Ny kode:     insert into public.invite_codes (code, note) values ('SAGA-XXXX', 'Hvem den er til');
+-- Steng koden: update public.invite_codes set active = false where code = 'SAGA-XXXX';
+create table if not exists public.invite_codes (
+  code       text primary key,
+  note       text not null default '',
+  active     boolean not null default true,
+  max_uses   integer,
+  uses       integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.invite_codes enable row level security; -- ingen policyer: appen kan verken lese eller endre kodene
+
+-- Sjekkes når en ny bruker opprettes. Kontoer uten gyldig kode avvises, også de som lages med «Add user» i Supabase.
+-- Brukere som inviteres på e-post («Invite user»), slipper gjennom.
+create or replace function public.check_invite_code() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare c text := upper(trim(coalesce(new.raw_user_meta_data->>'invite', '')));
+begin
+  if new.invited_at is not null then return new; end if;
+  update public.invite_codes set uses = uses + 1
+   where upper(code) = c and active and (max_uses is null or uses < max_uses);
+  if not found then raise exception 'Ugyldig invitasjonskode' using errcode = 'P0001'; end if;
+  return new;
+end $$;
+drop trigger if exists check_invite_code on auth.users;
+create trigger check_invite_code before insert on auth.users for each row execute function public.check_invite_code();

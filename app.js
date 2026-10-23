@@ -124,13 +124,14 @@ function demoClient(){
   const chain=()=>new Proxy(()=>{},{get:(t,k)=>k==="then"?(f,r)=>Promise.resolve(res).then(f,r):()=>chain(),apply:()=>chain()});
   return{from:()=>chain(),rpc:()=>chain(),
     storage:{from:()=>({upload:async()=>res,remove:async()=>res,createSignedUrls:async()=>({data:[],error:null})})},
-    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@sagatrail.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
+    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@sagatrail.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res,signInWithPassword:async()=>({error:{message:"Demo: innlogging er slått av"}}),signUp:async()=>({error:{message:"Demo: registrering er slått av"}})}};
 }
 const sb=DEMO?demoClient():CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
-const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
+const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false,pwMode:true,signup:false,invite:""};
+try{const k=new URLSearchParams(location.search).get("kode");if(k){S.signup=true;S.invite=k.trim().toUpperCase()}}catch(e){}
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
@@ -199,16 +200,24 @@ function vSetup(){
 }
 
 function vLogin(){
-  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.16" alt="${esc(APP_NAME)}"></h1>
-  ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
+  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=${esc(APP_VERSION)}" alt="${esc(APP_NAME)}"></h1>
+  ${S.signup?`<p class="small" style="margin:0 0 14px">Har du fått en invitasjonskode? Lag kontoen din her.</p>
+    <div class="field"><label for="s-email">E-post</label><input id="s-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
+    <div class="field"><label for="s-pw">Velg passord</label><input id="s-pw" type="password" autocomplete="new-password" minlength="8" placeholder="Minst 8 tegn"></div>
+    <div class="field"><label for="s-code">Invitasjonskode</label><input id="s-code" autocomplete="off" autocapitalize="characters" value="${esc(S.invite)}" placeholder="SAGA-XXXX"></div>
+    <div class="actions"><button class="btn" id="s-go">Lag konto</button></div>
+    <p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="s-back">Har du konto? Logg inn</button></p>`
+  :S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
     ${S.pwMode?`<div class="field"><label for="l-pw">Passord</label><input id="l-pw" type="password" autocomplete="current-password"></div>
     <div class="actions"><button class="btn" id="l-pwgo">Logg inn</button></div>
-    <p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="l-mode">Få innloggingslenke på e-post i stedet</button></p>`
+    <p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="l-mode">Få innloggingslenke på e-post i stedet</button></p>
+    <p class="small" style="margin-top:8px"><button type="button" class="linkbtn" id="l-signup">Ny tester? Lag konto med invitasjonskode</button></p>`
     :`<div class="actions"><button class="btn" id="l-send">Send innloggingslenke</button></div>
     <p class="small muted" style="margin-top:10px">Ingen passord. Du får en lenke på e-post, og holder deg innlogget på denne enheten.</p>
-    <p class="small" style="margin-top:8px"><button type="button" class="linkbtn" id="l-mode">Logg inn med passord</button></p>`}`}
+    <p class="small" style="margin-top:8px"><button type="button" class="linkbtn" id="l-mode">Logg inn med passord</button></p>
+    <p class="small" style="margin-top:8px"><button type="button" class="linkbtn" id="l-signup">Ny tester? Lag konto med invitasjonskode</button></p>`}`}
   <p class="err" id="lErr" hidden></p>
   <p class="small muted" style="margin-top:28px"><button type="button" class="linkbtn" data-goto="personvern">Personvern</button> · versjon ${esc(APP_VERSION)}</p></section>`;
 }
@@ -1464,6 +1473,25 @@ function bind(){
     if(r.error){pwgo.disabled=false;showErr("lErr",/invalid/i.test(r.error.message||"")?{message:"Feil e-post eller passord."}:r.error)}
   };
   const back=document.getElementById("l-back");if(back)back.onclick=()=>{S.loginSent=false;render()};
+  const lsu=document.getElementById("l-signup");if(lsu)lsu.onclick=()=>{const e=document.getElementById("l-email");if(e)S.loginEmail=e.value.trim();S.signup=true;render()};
+  const sba=document.getElementById("s-back");if(sba)sba.onclick=()=>{S.loginEmail=document.getElementById("s-email").value.trim();S.signup=false;S.pwMode=true;render()};
+  const sgo=document.getElementById("s-go");
+  if(sgo)sgo.onclick=async()=>{
+    const email=document.getElementById("s-email").value.trim(),password=document.getElementById("s-pw").value,invite=document.getElementById("s-code").value.trim().toUpperCase();
+    if(!email||!password||!invite)return showErr("lErr",{message:"Fyll inn e-post, passord og invitasjonskode."});
+    if(password.length<8)return showErr("lErr",{message:"Passordet må ha minst 8 tegn."});
+    sgo.disabled=true;
+    const r=await sb.auth.signUp({email,password,options:{data:{invite}}});
+    if(r.error){
+      sgo.disabled=false;const m=r.error.message||"";
+      return showErr("lErr",/database error|invitasjonskode/i.test(m)?{message:"Invitasjonskoden er feil eller brukt opp."}
+        :/already|registered/i.test(m)?{message:"Det finnes allerede en konto med denne e-posten. Logg inn med passord."}
+        :/not allowed|disabled/i.test(m)?{message:"Registrering er ikke åpnet ennå. Spør den som inviterte deg."}:r.error);
+    }
+    // Uten økt betyr at e-postbekreftelse er slått på i Supabase
+    if(!r.data.session){sgo.disabled=false;S.loginEmail=email;S.signup=false;S.loginSent=true;render()}
+    try{history.replaceState(null,"",location.pathname+location.hash)}catch(e){}
+  };
 
   document.querySelectorAll(".entry").forEach(b=>b.onclick=()=>{const s=S.sessions.find(x=>x.id===b.dataset.id);if(s)openForm(s)});
   const ss=document.getElementById("saveSet");
