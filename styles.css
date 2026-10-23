@@ -216,6 +216,19 @@ body.anon main{padding-bottom:40px}
 .home .legend{justify-content:center}
 .home .goal .row{flex-direction:row}
 
+/* Testversjon */
+.foot{text-align:center;margin-top:36px;line-height:1.9}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}
+.welcome{text-align:center;padding-top:4vh}
+.welcome .brand{font-size:2.8rem}
+.welcome .brand span{color:var(--accent)}
+.welcome>p{margin-top:10px}
+.steps{text-align:left;padding-left:22px;margin:18px 0 10px}
+.steps li{margin:10px 0}
+.prose h3{margin:18px 0 4px}
+.prose ul{padding-left:20px;margin:4px 0}
+.prose p{margin-top:4px}
+
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center}

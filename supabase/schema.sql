@@ -46,6 +46,31 @@ alter table public.okter add column if not exists rh   numeric;
 -- Egne mål: [{ id, name, type, km, hm, kg, date }]
 alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
 
+-- Tilbakemeldinger fra testbrukere. Leses i Supabase → Table Editor. Blir liggende uten bruker-ID hvis kontoen slettes.
+create table if not exists public.tilbakemeldinger (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users(id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  type       text not null default 'annet',
+  tekst      text not null,
+  side       text not null default '',
+  versjon    text not null default '',
+  enhet      text not null default ''
+);
+alter table public.tilbakemeldinger enable row level security;
+drop policy if exists "send tilbakemelding" on public.tilbakemeldinger;
+create policy "send tilbakemelding" on public.tilbakemeldinger for insert with check (auth.uid() = user_id);
+drop policy if exists "egne tilbakemeldinger" on public.tilbakemeldinger;
+create policy "egne tilbakemeldinger" on public.tilbakemeldinger for select using (auth.uid() = user_id);
+
+-- Lar en innlogget bruker slette sin egen konto. Profil og økter slettes via «on delete cascade».
+create or replace function public.delete_my_account() returns void
+language sql security definer set search_path = '' as $$
+  delete from auth.users where id = auth.uid();
+$$;
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.okter    enable row level security;
 

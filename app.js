@@ -120,7 +120,7 @@ async function loadAll(){
   if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
-    S.isNew=true;S.view="innst";
+    S.isNew=true;S.view="velkommen";
   }
   S.sessions=ok(o).map(rowToSession);
   S.loaded=true;render();
@@ -141,8 +141,8 @@ function render(){
   const app=document.getElementById("app");
   if(!sb)app.innerHTML=vSetup();
   else if(!S.authReady)app.innerHTML=`<p class="empty">Laster …</p>`;
-  else if(!S.user)app.innerHTML=vLogin();
-  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings,hund:vDog})[S.view]();
+  else if(!S.user)app.innerHTML=S.view==="personvern"?vPrivacy():vLogin();
+  else app.innerHTML=({hjem:vHome,logg:vLog,plan:vPlan,innst:vSettings,hund:vDog,velkommen:vWelcome,personvern:vPrivacy})[S.view]()+footer();
   bind();
 }
 
@@ -158,7 +158,69 @@ function vLogin(){
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
     <div class="actions"><button class="btn" id="l-send">Send innloggingslenke</button></div>
     <p class="small muted" style="margin-top:10px">Ingen passord. Du får en lenke på e-post, og holder deg innlogget på denne enheten.</p>`}
-  <p class="err" id="lErr" hidden></p></section>`;
+  <p class="err" id="lErr" hidden></p>
+  <p class="small muted" style="margin-top:28px"><button type="button" class="linkbtn" data-goto="personvern">Personvern</button> · versjon ${esc(APP_VERSION)}</p></section>`;
+}
+
+/* Testversjon: versjonsnummer, bunntekst, tilbakemelding, velkomst og personvern */
+const APP_VERSION=window.APP_VERSION||"dev";
+const VIEW_NAMES={hjem:"Oversikt",logg:"Logg",plan:"Plan",innst:"Profil",hund:"Hundeside",velkommen:"Velkommen",personvern:"Personvern"};
+function footer(){
+  return `<p class="foot small muted"><button type="button" class="linkbtn" id="fbOpen">Gi tilbakemelding</button> · <button type="button" class="linkbtn" data-goto="velkommen">Kom i gang</button> · <button type="button" class="linkbtn" data-goto="personvern">Personvern</button><br>Testversjon ${esc(APP_VERSION)}</p>`;
+}
+function openFeedback(){
+  const kinds=[["feil","Noe virker ikke"],["vanskelig","Vanskelig å forstå"],["onske","Ønske eller idé"],["annet","Annet"]];
+  let kind="feil";
+  const draw=()=>{panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Gi tilbakemelding</h2><button class="btn ghost" id="fbClose">Lukk</button></div>
+  <p class="small muted" style="margin-top:6px">Alt er nyttig, også små ting. Vi ser hvilken side du var på (${esc(VIEW_NAMES[S.view]||S.view)}) og hvilken versjon du bruker.</p>
+  <div class="field"><span class="flabel">Hva gjelder det?</span><div class="chips">${kinds.map(([v,l])=>`<button type="button" class="chip" data-fbk="${v}" aria-pressed="${kind===v}">${l}</button>`).join("")}</div></div>
+  <div class="field"><label for="fb-text">Beskriv</label><textarea id="fb-text" style="min-height:120px" placeholder="${kind==="feil"?"Hva gjorde du, og hva skjedde?":"Skriv fritt …"}"></textarea></div>
+  <p class="err" id="fbErr" hidden></p>
+  <div class="actions"><button class="btn" id="fbSend">Send</button></div>`;
+  const txt=panel.querySelector("#fb-text");
+  panel.querySelector("#fbClose").onclick=closeForm;
+  panel.querySelectorAll("[data-fbk]").forEach(b=>b.onclick=()=>{const v=txt.value;kind=b.dataset.fbk;draw();panel.querySelector("#fb-text").value=v});
+  panel.querySelector("#fbSend").onclick=async()=>{
+    const tekst=panel.querySelector("#fb-text").value.trim();
+    if(!tekst)return showErr("fbErr",{message:"Skriv litt om hva det gjelder."});
+    const btn=panel.querySelector("#fbSend");btn.disabled=true;
+    try{ok(await sb.from("tilbakemeldinger").insert({type:kind,tekst,side:VIEW_NAMES[S.view]||S.view,versjon:APP_VERSION,enhet:navigator.userAgent.slice(0,200)}));closeForm();toast("Takk for tilbakemeldingen!")}
+    catch(e){btn.disabled=false;showErr("fbErr",e)}
+  };};
+  draw();sheet.classList.add("open");
+}
+function vWelcome(){
+  const ios=/iPhone|iPad/.test(navigator.userAgent);
+  return `<section class="welcome"><h1 class="brand cond">Velkommen<span>!</span></h1>
+  <p>Slednecks er en treningslogg for deg og hunden. Alt fra turer og kløv til canicross og sledeløp.</p>
+  <p class="notice">Dette er en <b>testversjon</b>. Takk for at du er med og gjør appen bedre! Ting kan endre seg underveis.</p>
+  <ol class="steps">
+   <li><b>Legg appen på hjem-skjermen.</b> ${ios?"I Safari: trykk Del-knappen, og så «Legg til på Hjem-skjerm».":"I Chrome: trykk ⋮-menyen, og så «Legg til på startskjermen». På iPhone: Safari → Del → «Legg til på Hjem-skjerm»."}</li>
+   <li><b>Sett opp profilen.</b> Velg et løp fra kalenderen eller lag ditt eget mål, velg gren og legg inn hundene dine. Da får du en treningsplan.</li>
+   <li><b>Fyll inn info om hundene.</b> Trykk på en hund på Oversikt for å legge inn vekt, chip og vaksiner. Appen sier fra om noe mangler.</li>
+   <li><b>Før økter med +.</b> Velg «Med hunder» eller «Bare meg». Din egen trening holdes adskilt fra hundenes.</li>
+   <li><b>Slå på været.</b> På Oversikt ser du varmerisiko for hundene og når det er best å trene.</li>
+   <li><b>Si hva du synes.</b> Nederst på hver side finner du «Gi tilbakemelding». Feil, ting som er vanskelige og ønsker er like nyttige.</li>
+  </ol>
+  <p class="small muted">Tips: Ta en backup innimellom under Profil → Backup.</p>
+  <div class="actions"><button class="btn" id="wlGo">${S.isNew?"Sett opp profilen":"Til oversikten"}</button></div></section>`;
+}
+function vPrivacy(){
+  return `<section class="prose"><div class="actions" style="margin-top:4px"><button class="btn ghost" id="pvBack">← Tilbake</button></div>
+  <h1 class="cond" style="font-size:2.2rem;margin-top:12px">Personvern</h1>
+  <p class="small muted">Sist oppdatert 23. oktober 2026 · testversjon</p>
+  <h3>Hvem er ansvarlig</h3><p>Eilin Bergum (Bergum Kreativ) er ansvarlig for Slednecks. Spørsmål sendes til <a href="mailto:eilin@eilinbergum.com">eilin@eilinbergum.com</a>.</p>
+  <h3>Hva vi lagrer</h3><ul>
+   <li>E-postadressen din, for å logge deg inn.</li>
+   <li>Det du fører inn: økter, mål, treningsplan, løp, hunder og hundeinfo (som vekt, chip-ID og vaksiner).</li>
+   <li>Tilbakemeldinger du sender, med hvilken side du var på, versjon og type enhet og nettleser.</li></ul>
+  <p>Vi samler ikke inn noe annet, og bruker ikke sporing, reklame eller analyseverktøy.</p>
+  <h3>Hvor dataene ligger</h3><p>Dataene lagres hos Supabase, på servere i EU (Irland). Bare du har tilgang til dine egne data i appen. Den ansvarlige kan se dem i databasen ved behov for feilretting og drift.</p>
+  <h3>Posisjon og vær</h3><p>Viser du været, spør appen om posisjonen din. Den lagres bare på din enhet, og sendes avrundet (omtrent 100 meter) til Meteorologisk institutt (MET Norway) for å hente værvarselet.</p>
+  <h3>Andre tjenester</h3><p>Appen ligger på GitHub Pages, og bruker skrifttyper fra Google Fonts og programkode fra jsDelivr. Disse tjenestene ser IP-adressen din når appen lastes, slik det er for nettsider flest.</p>
+  <h3>Hvorfor</h3><p>Vi behandler opplysningene for å gi deg tjenesten du har bedt om (personvernforordningen artikkel 6 nr. 1 bokstav b), og tilbakemeldinger for å forbedre appen.</p>
+  <h3>Dine rettigheter</h3><p>Du kan når som helst laste ned alle øktene dine under Profil → Backup, rette det du har ført inn, og slette kontoen din under Profil → Konto. Da slettes profilen, hundene og alle øktene dine. Du kan også klage til Datatilsynet.</p>
+  <h3>Hvor lenge</h3><p>Dataene lagres så lenge du har konto. Tilbakemeldinger beholdes uten kobling til deg etter at kontoen er slettet.</p></section>`;
 }
 
 function goalRow(label,done,goal,fmt,unit){
@@ -666,7 +728,10 @@ function vSettings(){
   <p class="err" id="impErr" hidden></p>
   <h2>Konto</h2>
   <p class="muted">Innlogget som ${esc(S.user?.email||"")}</p>
-  <div class="actions"><button class="btn ghost" id="logoutBtn">Logg ut</button></div>`;
+  <div class="actions"><button class="btn ghost" id="logoutBtn">Logg ut</button></div>
+  <details class="rules" style="margin-top:18px"><summary>Slett kontoen min</summary>
+   <p class="small">Dette sletter profilen, hundene, planen og alle øktene dine for godt. Last ned en backup først hvis du vil ta vare på noe.</p>
+   <div class="actions"><button class="btn del" id="delAcc">Slett kontoen og alle data</button></div><p class="err" id="delErr" hidden></p></details>`;
 }
 
 /* Skjema */
@@ -806,6 +871,18 @@ async function importData(file){
 }
 
 function bind(){
+  document.querySelectorAll("[data-goto]").forEach(b=>b.onclick=()=>{S.prevView=S.view;S.view=b.dataset.goto;render();window.scrollTo(0,0)});
+  const fo=document.getElementById("fbOpen");if(fo)fo.onclick=openFeedback;
+  const wl=document.getElementById("wlGo");if(wl)wl.onclick=()=>{S.view=S.isNew?"innst":"hjem";render();window.scrollTo(0,0)};
+  const pv=document.getElementById("pvBack");if(pv)pv.onclick=()=>{S.view=S.prevView&&S.prevView!=="personvern"?S.prevView:"hjem";render();window.scrollTo(0,0)};
+  const da=document.getElementById("delAcc");
+  if(da)da.onclick=async()=>{
+    if(!confirm("Slette kontoen og alle dataene dine for godt? Dette kan ikke angres."))return;
+    if(prompt("Skriv SLETT for å bekrefte")!=="SLETT")return;
+    da.disabled=true;
+    try{ok(await sb.rpc("delete_my_account"));await sb.auth.signOut();toast("Kontoen er slettet")}
+    catch(e){da.disabled=false;showErr("delErr",e)}
+  };
   const wp=document.getElementById("wxPos");if(wp)wp.onclick=askPos;
   const wr=document.getElementById("wxRetry");if(wr)wr.onclick=()=>{W.err="";loadWeather(true);render()};
   if(S.user&&S.view==="hjem")loadWeather();

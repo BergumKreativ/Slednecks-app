@@ -41,3 +41,14 @@ Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hu
 ## Vær og belastning
 
 Vær hentes fra MET Norway (api.met.no, CC BY 4.0) for posisjonen til nettleseren. Varmerisikoen bygger på NHFs barmarksgrenser (16/18 °C) og «150-regelen» (°F + luftfuktighet %). Belastning sammenligner siste 7 dager med snittet av de 4 ukene før; toleransen kan settes per hund.
+
+## Testversjon og utgivelser
+
+- Versjonsnummeret står i `index.html` (`window.APP_VERSION` og `?v=` på alle filer). **Øk det ved hver utgivelse**, så telefonene henter de nye filene i stedet for gamle fra hurtigbufferen.
+- Tilbakemeldinger fra testbrukere havner i tabellen `tilbakemeldinger` (Supabase → Table Editor).
+- Brukere kan slette egen konto under Profil → Konto (funksjonen `delete_my_account`).
+- Nye testbrukere: Supabase → Authentication → Users → Add user → Send invitation. Krever egen e-posttjeneste (SMTP), se under.
+
+## E-post (SMTP)
+
+Supabase sender bare til medlemmer av prosjektteamet uten egen SMTP. Oppsett med Resend: lag konto på resend.com, legg til og bekreft domenet (DNS-poster hos domeneleverandøren), og koble til Supabase (Resend → Integrations → Supabase, eller Supabase → Authentication → Emails → SMTP Settings med host `smtp.resend.com`, port 465, bruker `resend`, passord = API-nøkkel).
