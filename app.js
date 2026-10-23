@@ -146,6 +146,7 @@ function render(){
   if(bigMap){bigMap.remove();bigMap=null}
   buildPlan();
   document.body.classList.toggle("anon",!S.user);
+  if(!sb||S.authReady)hideSplash();
   document.querySelectorAll(".tab").forEach(t=>{if(t.dataset.v===S.view)t.setAttribute("aria-current","page");else t.removeAttribute("aria-current")});
   const app=document.getElementById("app");
   if(!sb)app.innerHTML=vSetup();
@@ -156,12 +157,12 @@ function render(){
 }
 
 function vSetup(){
-  return `<section class="login"><h1 class="brand cond">${esc(APP_NAME)}<span>.</span></h1>
+  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.12" alt="${esc(APP_NAME)}"></h1>
   <p class="notice">Appen er ikke koblet til databasen ennå. Fyll inn Supabase-adressen og «anon public»-nøkkelen i <b>config.js</b>.</p></section>`;
 }
 
 function vLogin(){
-  return `<section class="login"><h1 class="brand cond">${esc(APP_NAME)}<span>.</span></h1><p class="muted" style="margin-top:6px">Treningslogg for deg og hunden</p>
+  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.12" alt="${esc(APP_NAME)}"></h1>
   ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
@@ -1293,6 +1294,9 @@ sheet.addEventListener("click",e=>{if(e.target===sheet)closeForm()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeForm()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh()});
 
+// Startskjerm: skjules når innloggingsstatus er kjent, men vises minst 900 ms
+const SPLASH_T0=Date.now();
+function hideSplash(){const el=document.getElementById("splash");if(!el||el.classList.contains("hide"))return;setTimeout(()=>{el.classList.add("hide");setTimeout(()=>el.remove(),600)},Math.max(0,900-(Date.now()-SPLASH_T0)))}
 const NAV_ICONS={hjem:"house",logg:"list",plan:"calendar-days",innst:"user"};
 document.querySelectorAll(".tab").forEach(t=>{t.innerHTML=`${icon(NAV_ICONS[t.dataset.v])}<span>${t.textContent}</span>`});
 document.getElementById("addBtn").innerHTML=icon("plus");
