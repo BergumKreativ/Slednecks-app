@@ -717,7 +717,7 @@ function feedNeed(n){
 }
 function feedOptions(sel){
   const groups={};for(const f of window.FEEDS||[])(groups[f.brand]=groups[f.brand]||[]).push(f);
-  return `<option value="">Velg fôr</option>`+Object.entries(groups).sort((a,b)=>(a[0].startsWith("Rent kjøtt")-b[0].startsWith("Rent kjøtt"))||a[0].localeCompare(b[0],"nb")).map(([b,fs])=>`<optgroup label="${esc(b)}">${fs.map(f=>`<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.product)} · ${f.kcal100} kcal/100 g</option>`).join("")}</optgroup>`).join("")+`<option value="custom" ${sel==="custom"?"selected":""}>Annet fôr – skriv inn selv</option>`;
+  return `<option value="">Velg fôr</option>`+Object.entries(groups).sort((a,b)=>{const last=k=>k.startsWith("Rent kjøtt")?1:k.startsWith("Fett og olje")?2:0;return last(a[0])-last(b[0])||a[0].localeCompare(b[0],"nb")}).map(([b,fs])=>`<optgroup label="${esc(b)}">${fs.map(f=>`<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.product)} · ${f.kcal100} kcal/100 g</option>`).join("")}</optgroup>`).join("")+`<option value="custom" ${sel==="custom"?"selected":""}>Annet fôr – skriv inn selv</option>`;
 }
 function feedSection(n){
   const i=dogInfo(n), need=feedNeed(n), log=activityFromLog(n), r10=v=>Math.round(v/10)*10;
