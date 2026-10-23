@@ -1,4 +1,6 @@
-# Slednecks – treningslogg
+# Spåtind – trening for deg og hunden
+
+(Arbeidsnavn. Tidligere «Slednecks». Navnet settes i `index.html` som `window.APP_NAME`.)
 
 Nettapp for å føre og følge opp treningsøkter med hundene frem mot løpet. Ren HTML/JS uten byggesteg, med Supabase som database og innlogging.
 

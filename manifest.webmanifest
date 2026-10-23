@@ -1,6 +1,6 @@
 {
-  "name": "Slednecks – treningslogg",
-  "short_name": "Slednecks",
+  "name": "Spåtind – trening for deg og hunden",
+  "short_name": "Spåtind",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

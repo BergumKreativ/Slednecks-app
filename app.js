@@ -114,6 +114,7 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
+const APP_NAME=window.APP_NAME||"Spåtind"; // Arbeidsnavn – endres ett sted i index.html
 const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
 const ok=r=>{if(r.error)throw r.error;return r.data};
@@ -155,12 +156,12 @@ function render(){
 }
 
 function vSetup(){
-  return `<section class="login"><h1 class="brand cond">Slednecks<span>.</span></h1>
+  return `<section class="login"><h1 class="brand cond">${esc(APP_NAME)}<span>.</span></h1>
   <p class="notice">Appen er ikke koblet til databasen ennå. Fyll inn Supabase-adressen og «anon public»-nøkkelen i <b>config.js</b>.</p></section>`;
 }
 
 function vLogin(){
-  return `<section class="login"><h1 class="brand cond">Slednecks<span>.</span></h1><p class="muted" style="margin-top:6px">Treningslogg for deg og hunden</p>
+  return `<section class="login"><h1 class="brand cond">${esc(APP_NAME)}<span>.</span></h1><p class="muted" style="margin-top:6px">Treningslogg for deg og hunden</p>
   ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
@@ -200,7 +201,7 @@ function openFeedback(){
 function vWelcome(){
   const ios=/iPhone|iPad/.test(navigator.userAgent);
   return `<section class="welcome"><h1 class="brand cond">Velkommen<span>!</span></h1>
-  <p>Slednecks er en treningslogg for deg og hunden. Alt fra turer og kløv til canicross og sledeløp.</p>
+  <p>${esc(APP_NAME)} er en treningslogg for deg og hunden. Alt fra turer og kløv til canicross og sledeløp.</p>
   <p class="notice">Dette er en <b>testversjon</b>. Takk for at du er med og gjør appen bedre! Ting kan endre seg underveis.</p>
   <ol class="steps">
    <li><b>Legg appen på hjem-skjermen.</b> ${ios?"I Safari: trykk Del-knappen, og så «Legg til på Hjem-skjerm».":"I Chrome: trykk ⋮-menyen, og så «Legg til på startskjermen». På iPhone: Safari → Del → «Legg til på Hjem-skjerm»."}</li>
@@ -217,7 +218,7 @@ function vPrivacy(){
   return `<section class="prose"><div class="actions" style="margin-top:4px"><button class="btn ghost" id="pvBack">← Tilbake</button></div>
   <h1 class="cond" style="font-size:2.2rem;margin-top:12px">Personvern</h1>
   <p class="small muted">Sist oppdatert 23. oktober 2026 · testversjon</p>
-  <h3>Hvem er ansvarlig</h3><p>Eilin Bergum (Bergum Kreativ) er ansvarlig for Slednecks. Spørsmål sendes til <a href="mailto:eilin@eilinbergum.com">eilin@eilinbergum.com</a>.</p>
+  <h3>Hvem er ansvarlig</h3><p>Eilin Bergum (Bergum Kreativ) er ansvarlig for ${esc(APP_NAME)}. Spørsmål sendes til <a href="mailto:eilin@eilinbergum.com">eilin@eilinbergum.com</a>.</p>
   <h3>Hva vi lagrer</h3><ul>
    <li>E-postadressen din, for å logge deg inn.</li>
    <li>Det du fører inn: økter, mål, treningsplan, løp, hunder og hundeinfo (som vekt, chip-ID og vaksiner).</li>
@@ -1140,13 +1141,13 @@ function exportData(){
   const data={app:"slednecks",versjon:1,eksportert:new Date().toISOString(),profil:S.profile,okter:S.sessions.map(toRow)};
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
-  a.download=`slednecks-backup-${iso(new Date())}.json`;a.click();
+  a.download=`${APP_NAME.toLowerCase().replace("å","a")}-backup-${iso(new Date())}.json`;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 async function importData(file){
   const data=JSON.parse(await file.text());
   const list=Array.isArray(data)?data:data.okter;
-  if(!Array.isArray(list))throw new Error("Fila ser ikke ut som en Slednecks-backup.");
+  if(!Array.isArray(list))throw new Error("Fila ser ikke ut som en backup fra appen.");
   const key=s=>`${s.dato}|${s.kategori==="meg"?"meg":"hund"}|${typeOf(s.type,s.kategori)}|${num(s.km)}|${num(s.min)}`;
   const have=new Set(S.sessions.map(key));
   const rows=list.filter(s=>s&&/^\d{4}-\d{2}-\d{2}$/.test(s.dato)&&!have.has(key(s))).map(toRow);
