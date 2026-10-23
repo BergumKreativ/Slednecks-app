@@ -390,7 +390,7 @@ function vHome(){
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `<div class="home">
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
-  <section class="hero">${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
+  <section class="hero">${hero}</section><p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${progressCard(t)}
   ${trail(bw,t)}
   <section class="week">

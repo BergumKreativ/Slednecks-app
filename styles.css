@@ -303,3 +303,24 @@ h3.t-me{color:var(--th)}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.show{opacity:1}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* Gradient-tema «Solnedgang på fjellet»: én gradient som kjennetegn, resten nøytralt.
+   Knappene bruker den mørkeste delen av gradienten så hvit tekst er lett å lese. */
+:root{--grad:linear-gradient(135deg,#A80D26 0%,#C2381A 55%,#D2611C 100%);--grad-btn:linear-gradient(90deg,#B30E29,#C2410C);--grad-line:linear-gradient(90deg,#C8102E,#E8542B,#F2A03D)}
+.t-dog,.t-me,.t-wx,.t-trail,.t-plan,.t-health{--th:var(--ink);--th-soft:var(--soft)}
+.shi{background:var(--soft);color:var(--ink)}
+h3.t-me{color:inherit}
+.card{border-color:var(--line)!important;background:var(--card)!important}
+.card b .ic{color:inherit}
+.t-dog .dog,.feedres.t-dog,.goal.t-me{position:relative;overflow:hidden;border:1.5px solid var(--line);background:var(--card)}
+.t-dog .dog::before,.feedres.t-dog::before,.goal.t-me::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--grad-line)}
+.stats.t-me div{border-color:var(--line);background:var(--card)}
+.bar span,.goal.t-me .bar span{background:var(--grad-line)}
+.eico{background:var(--soft);color:var(--ink)}
+.btn:not(.line):not(.ghost):not(.del){background:var(--grad-btn);color:#fff}
+.add{background:var(--grad-btn);color:#fff}
+.tab[aria-current="page"]{box-shadow:none;background:var(--grad-line) top/100% 3px no-repeat}
+.home .hero{background:var(--grad);color:#fff;border-radius:24px;padding:22px 16px 18px;margin-top:4px}
+.home .hero .count small{color:#fff;opacity:.92}
+.home .race{margin-top:10px}
+.pill.ok,.pill.warn,.pill.bad{background:var(--soft)}
