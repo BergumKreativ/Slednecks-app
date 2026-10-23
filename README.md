@@ -58,3 +58,5 @@ Supabase sender bare til medlemmer av prosjektteamet uten egen SMTP. Oppsett med
 - Føremeldinger (`foremeldinger`) deles med alle innloggede brukere i 14 dager. Moderering: slett rader i Supabase → Table Editor.
 - Skiløyper hentes direkte fra Kartverkets Turrutebase (WFS `wfs.geonorge.no/skwms1/wfs.turogfriluftsruter`, typen `app:Skiløype`, bbox i lat,lon) når man zoomer inn.
 - Løypestatus fra Sporet (Skiforeningen/Swix) og Løyper.net/Hundesporet (FMS Nordic) har ikke åpne API-er og krever avtale.
+
+Ikoner: [Lucide](https://lucide.dev) (ISC-lisens), samlet i `icons.js`.

@@ -1,6 +1,8 @@
 :root{
   --bg:#FFFFFF; --ink:#000000; --card:#FFFFFF; --soft:#F3F3F3; --line:#E2E2E2; --muted:#6B6B6B;
   --accent:#D7263D; --accent-ink:#FFFFFF; --accent-soft:#FBE3E6; --good:#2E8B57; --warn:#D99A00; --bad:#A3122A;
+  --c-dog:#2B6CB0; --c-dog-soft:#E4EEFA; --c-me:#B7791F; --c-me-soft:#FBF0DC; --c-wx:#0E8A9A; --c-wx-soft:#DDF3F5;
+  --c-trail:#2F855A; --c-trail-soft:#E1F3E8; --c-plan:#6B46C1; --c-plan-soft:#ECE6FA; --c-health:#B83280; --c-health-soft:#F9E3EF;
   color-scheme:light; box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
@@ -8,11 +10,15 @@
   :root:not([data-theme="light"]){
     --bg:#000000; --ink:#FFFFFF; --card:#141414; --soft:#1C1C1C; --line:#2C2C2C; --muted:#A3A3A3;
     --accent:#FF4D5E; --accent-ink:#000000; --accent-soft:#3D1218; --good:#5FC48A; --warn:#F2C14E; --bad:#FF7A85; color-scheme:dark;
+    --c-dog:#7FB2EE; --c-dog-soft:#14243A; --c-me:#F0C060; --c-me-soft:#2E2410; --c-wx:#5CCFDB; --c-wx-soft:#0F2A2D;
+    --c-trail:#6FCF97; --c-trail-soft:#122A1C; --c-plan:#B49AF0; --c-plan-soft:#221A36; --c-health:#F08AC4; --c-health-soft:#331526;
   }
 }
 :root[data-theme="dark"]{
   --bg:#000000; --ink:#FFFFFF; --card:#141414; --soft:#1C1C1C; --line:#2C2C2C; --muted:#A3A3A3;
   --accent:#FF4D5E; --accent-ink:#000000; --accent-soft:#3D1218; --good:#5FC48A; --warn:#F2C14E; --bad:#FF7A85; color-scheme:dark;
+    --c-dog:#7FB2EE; --c-dog-soft:#14243A; --c-me:#F0C060; --c-me-soft:#2E2410; --c-wx:#5CCFDB; --c-wx-soft:#0F2A2D;
+    --c-trail:#6FCF97; --c-trail-soft:#122A1C; --c-plan:#B49AF0; --c-plan-soft:#221A36; --c-health:#F08AC4; --c-health-soft:#331526;
 }
 *,*::before,*::after{box-sizing:border-box}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -168,7 +174,6 @@ body.anon main{padding-bottom:40px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 .chips.rpe{gap:6px}
 .chips.rpe .chip{min-width:40px;padding:8px 0;text-align:center}
-.entry.me .t::before{content:"● ";color:var(--warn)}
 
 .goal{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:12px 14px;margin-top:10px}
 .gbar{margin-top:8px}
@@ -260,6 +265,34 @@ body.anon main{padding-bottom:40px}
 .rep p{margin-top:2px}
 .leaflet-popup-content .rep{border:0;padding:0;min-width:180px}
 .center{text-align:center}
+
+/* Ikoner og fargekoder per område */
+.ic{width:1.15em;height:1.15em;vertical-align:-.2em;flex:0 0 auto}
+.ic.sm{width:1em;height:1em}
+.t-dog{--th:var(--c-dog);--th-soft:var(--c-dog-soft)}
+.t-me{--th:var(--c-me);--th-soft:var(--c-me-soft)}
+.t-wx{--th:var(--c-wx);--th-soft:var(--c-wx-soft)}
+.t-trail{--th:var(--c-trail);--th-soft:var(--c-trail-soft)}
+.t-plan{--th:var(--c-plan);--th-soft:var(--c-plan-soft)}
+.t-health{--th:var(--c-health);--th-soft:var(--c-health-soft)}
+h2.sh{display:flex;align-items:center;gap:10px}
+.home h2.sh{justify-content:center}
+.shi{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:12px;background:var(--th-soft);color:var(--th);flex:0 0 auto}
+.shi .ic{width:20px;height:20px}
+h3.t-me{color:var(--th)}
+.card{border-color:color-mix(in srgb,var(--th) 35%,var(--line))!important;background:linear-gradient(180deg,var(--th-soft),var(--card) 70%)!important}
+.card b .ic{color:var(--th)}
+.t-dog .dog{border-color:color-mix(in srgb,var(--c-dog) 30%,var(--line));border-top:4px solid var(--c-dog)}
+.stats.t-me div{border-color:color-mix(in srgb,var(--c-me) 35%,var(--line));background:var(--c-me-soft)}
+.goal.t-me{border-left:4px solid var(--c-me)}
+.goal.t-me .bar span{background:var(--c-me)}
+.feedres.t-dog{border-color:var(--c-dog);background:linear-gradient(180deg,var(--c-dog-soft),var(--card) 80%)}
+.eico{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:var(--th-soft);color:var(--th);margin-right:6px;vertical-align:-5px}
+.eico .ic{width:14px;height:14px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab .ic{width:22px;height:22px}
+.add .ic{width:28px;height:28px;stroke-width:2.6}
+.add{display:flex;align-items:center;justify-content:center}
 
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}

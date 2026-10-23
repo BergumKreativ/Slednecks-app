@@ -102,6 +102,9 @@ const fmtD=d=>d.toLocaleDateString("nb-NO",{day:"numeric",month:"short"}).replac
 const fmtKm=n=>(Math.round((Number(n)||0)*10)/10).toLocaleString("nb-NO");
 const fmtMin=m=>{m=Math.round(Number(m)||0);const h=Math.floor(m/60),r=m%60;return h?`${h} t ${r} min`:`${r} min`};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Ikoner (icons.js) og seksjonsoverskrifter med farge per område: dog, me, wx, trail, plan, health
+const icon=(n,cls)=>`<svg class="ic${cls?" "+cls:""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${(window.ICONS||{})[n]||""}</svg>`;
+const sh=(ic,title,theme,style)=>`<h2 class="sh t-${theme}"${style?` style="${style}"`:""}><span class="shi">${icon(ic)}</span>${title}</h2>`;
 const sum=(a,f)=>a.reduce((x,y)=>x+(Number(y[f])||0),0);
 const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 
@@ -263,11 +266,11 @@ function reportHtml(r,withDel){
 function foreCard(){
   if(!REP.at){loadReports();return `<p class="small muted center">Henter føremeldinger …</p>`}
   const pos=savedPos(), near=pos?REP.list.filter(r=>kmBetween(pos,r)<=50):REP.list, recent=near.filter(r=>Date.now()-new Date(r.created_at)<3*864e5);
-  return `<div class="wx">${recent.length?`<p><b>${recent.length} ${recent.length===1?"melding":"meldinger"}</b> ${pos?"innen 50 km":"i hele landet"} siste 3 dager</p>${reportHtml(recent[0],false)}`:`<p class="small muted">Ingen føremeldinger ${pos?"i nærheten":""} siste 3 dager. Vær den første til å melde om føret!</p>`}
+  return `<div class="wx card t-trail">${recent.length?`<p><b>${recent.length} ${recent.length===1?"melding":"meldinger"}</b> ${pos?"innen 50 km":"i hele landet"} siste 3 dager</p>${reportHtml(recent[0],false)}`:`<p class="small muted">Ingen føremeldinger ${pos?"i nærheten":""} siste 3 dager. Vær den første til å melde om føret!</p>`}
    <div class="actions"><button type="button" class="btn line" data-goto="kart">Åpne kartet</button></div></div>`;
 }
 function vMap(){
-  return `<h2 style="margin-top:6px">Føre og løyper</h2>
+  return `${sh("route","Føre og løyper","trail","margin-top:6px")}
   <p class="muted small">Trykk på kartet for å velge sted, og meld om føret. Meldingene vises for alle brukere i 14 dager.</p>
   <div id="bigmap" class="map big" role="application" aria-label="Kart med løyper og føremeldinger"></div>
   <div class="legend" style="margin-top:8px"><span><b style="background:var(--good)"></b>Siste døgn</span><span><b style="background:var(--warn)"></b>1–3 dager</span><span><b style="background:var(--muted)"></b>Eldre</span><span><b style="background:#1f6feb"></b>Skiløype</span></div>
@@ -398,15 +401,15 @@ function vHome(){
       <div><p class="lab muted">Neste langtur</p><p class="what">${next?`${DAYS[(next.d.getDay()+6)%7]} ${fmtD(next.d)}: ${esc(next.txt.replace(/^❄ /,""))}`:"–"}</p></div>
     </div>
   </section>
-  <h2>Føre og løyper</h2>
+  ${sh("route","Føre og løyper","trail")}
   ${foreCard()}
-  <h2>Vær og varme</h2>
+  ${sh("cloud-sun","Vær og varme","wx")}
   ${weatherCard()}
-  <h2>Hundene</h2>
-  ${S.profile.dogs.length?`<div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
-  <div class="row center" style="margin-top:28px"><h2 style="margin:0">Deg</h2><button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
+  ${sh("paw-print","Hundene","dog")}
+  ${S.profile.dogs.length?`<div class="dogs t-dog">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
+  <div class="row center" style="margin-top:28px">${sh("person-standing","Deg","me","margin:0")}<button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
   ${meCard(t)}
-  <h2>Uke for uke</h2>
+  ${sh("trending-up","Uke for uke","plan")}
   ${chart(bw)}</div>`;
 }
 
@@ -446,7 +449,7 @@ const RISK=[
 ];
 const HEAT_SIGNS="Tegn på overoppheting: kraftig pesing, bred og mørk tunge, sikling, vingling eller at hunden vil stoppe. Stopp, finn skygge og kjøl ned med vann (ikke iskaldt). Kontakt veterinær ved tvil.";
 function weatherCard(){
-  if(!savedPos())return `<div class="wx"><p class="small muted">Se temperatur, luftfuktighet og varmerisiko for hundene der du er, og når det er best å trene.</p>
+  if(!savedPos())return `<div class="wx card t-wx"><p class="small muted">Se temperatur, luftfuktighet og varmerisiko for hundene der du er, og når det er best å trene.</p>
     ${W.err==="denied"?`<p class="small err">Fikk ikke tilgang til posisjonen. Slå på stedstjenester for nettleseren og prøv igjen.</p>`:""}
     <div class="actions"><button class="btn line" id="wxPos">Vis vær der jeg er</button></div></div>`;
   if(!W.data)return `<div class="wx"><p class="small muted">${W.err?"Fikk ikke hentet været. Prøv igjen senere.":"Henter vær …"}</p>${W.err?`<div class="actions"><button class="btn ghost sm" id="wxRetry">Prøv igjen</button></div>`:""}</div>`;
@@ -454,7 +457,7 @@ function weatherCard(){
   const next=W.data.filter(x=>x.t>new Date()&&x.t<new Date(Date.now()+24*3600e3));
   const best=next.filter(x=>x.t.getHours()>=5&&x.t.getHours()<=22).reduce((a,x)=>!a||heatRisk(x.temp,x.rh).sum<heatRisk(a.temp,a.rh).sum?x:a,null);
   const hh=d=>d.toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
-  return `<div class="wx"><div class="row"><b>Vær nå</b><span class="pill ${R.c}">${R.t}</span></div>
+  return `<div class="wx card t-wx"><div class="row"><b>${icon("thermometer","sm")} Vær nå</b><span class="pill ${R.c}">${R.t}</span></div>
    <div class="wxnow"><span class="cond">${fmtKm(now.temp)}°</span><span>${Math.round(now.rh)} % fuktighet<br>${fmtKm(now.wind)} m/s vind</span></div>
    <div class="wxbar" aria-label="Varmerisiko neste 24 timer">${next.map(x=>`<i class="r${heatRisk(x.temp,x.rh).lvl}" title="${hh(x.t)}: ${fmtKm(x.temp)}°, ${Math.round(x.rh)} %"></i>`).join("")}</div>
    <p class="small muted">Neste 24 timer${best&&r.lvl>0?` · svalest/tørrest kl. ${hh(best.t)}: ${fmtKm(best.temp)}°, ${Math.round(best.rh)} %`:""}</p>
@@ -493,7 +496,7 @@ function meCard(t){
   const rpes=wk.map(s=>s.rpe).filter(Boolean), avg=rpes.length?Math.round(rpes.reduce((a,b)=>a+b,0)/rpes.length*10)/10:null;
   const goals=goalsHtml();
   if(!meS().length&&!withDog.length)return `<p class="notice">Logg din egen trening her, som løping, styrke og ski. Den holdes adskilt fra hundenes ukemål. Trykk «+ Egen økt» for å starte.</p>${goals}`;
-  return `<div class="stats" style="margin-top:10px"><div><span class="cond">${wk.length}</span><small>økter denne uka</small></div><div><span class="cond">${fmtMin(sum(wk,"min")).replace(" min","m").replace(" t ","t ")}</span><small>tid</small></div>
+  return `<div class="stats t-me" style="margin-top:10px"><div><span class="cond">${wk.length}</span><small>økter denne uka</small></div><div><span class="cond">${fmtMin(sum(wk,"min")).replace(" min","m").replace(" t ","t ")}</span><small>tid</small></div>
    <div><span class="cond">${avg!=null?String(avg).replace(".",","):"–"}</span><small>snitt anstrengelse</small></div><div><span class="cond">${d28.length}</span><small>økter siste 4 uker</small></div></div>
    ${loadBox(meLoad(),v=>Math.round(v)+" p")}
    ${withDog.length?`<p class="small muted" style="margin-top:8px">I tillegg har du vært aktiv med hundene i ${fmtMin(sum(withDog,"min"))} denne uka (canicross, skijøring, sykkel, gåtur, kløv).</p>`:""}${goals}`;
@@ -534,9 +537,9 @@ function goalPlan(g){
 function goalsHtml(){
   const gs=S.profile.myGoals||[];
   const bar=(label,v,goal,unit)=>{const pct=Math.min(100,v/goal*100);return `<div class="gbar"><div class="row small"><span>${label}</span><span class="muted">${fmtKm(v)} / ${fmtKm(goal)} ${unit}</span></div><div class="bar"><span style="width:${pct}%"></span></div></div>`};
-  return `<div class="row center" style="margin-top:18px"><h3>Mine mål</h3><button class="btn ghost sm" id="addGoal">+ Nytt mål</button></div>
+  return `<div class="row center" style="margin-top:18px"><h3 class="t-me">${icon("target","sm")} Mine mål</h3><button class="btn ghost sm" id="addGoal">+ Nytt mål</button></div>
   ${gs.length?gs.map(g=>{const p=goalProgress(g),days=g.date?Math.round((parse(g.date)-todayD())/864e5):null;
-    return `<button type="button" class="goal" data-goal="${esc(g.id)}"><div class="row"><b>${esc(g.name)}</b><span class="small ${p.done?"badge-ok":"muted"}">${p.done?"Nådd ✓":days!=null?(days>=0?`om ${days} dager`:"datoen er passert"):""}</span></div>
+    return `<button type="button" class="goal t-me" data-goal="${esc(g.id)}"><div class="row"><b>${esc(g.name)}</b><span class="small ${p.done?"badge-ok":"muted"}">${p.done?"Nådd ✓":days!=null?(days>=0?`om ${days} dager`:"datoen er passert"):""}</span></div>
      <p class="small muted">${esc(g.type||"Alle typer")}${g.date?` · ${parse(g.date).toLocaleDateString("nb-NO",{day:"numeric",month:"long",year:"numeric"})}`:""}</p>
      ${g.km?bar("Lengste tur",p.km,g.km,"km"):""}${g.hm?bar("Mest stigning",p.hm,g.hm,"hm"):""}${g.kg?bar("Tyngste sekk",p.kg,g.kg,"kg"):""}
      ${!g.km&&!g.hm&&!g.kg?`<p class="small muted">Sett distanse, høydemeter eller sekkvekt for å følge fremgangen.</p>`:p.done?"":(()=>{const gp=goalPlan(g),w=gp.find(x=>x.from<=todayD()&&addDays(x.from,7)>todayD());return w?`<p class="small" style="margin-top:8px"><b>Denne uka:</b> ${esc(w.txt)}</p>`:gp.length?`<p class="small muted" style="margin-top:8px">Planen starter ${gp[0].from.toLocaleDateString("nb-NO",{day:"numeric",month:"long"})}. Til da: tren som vanlig.</p>`:""})()}</button>`}).join("")
@@ -591,7 +594,7 @@ function progressCard(t){
       <text x="66" y="84" text-anchor="middle" style="font:500 10.5px 'Barlow',sans-serif;fill:var(--muted)">av planen</text>
     </svg>
     <div>
-      <h3>Mot målet</h3>
+      <h3>${icon("flag","sm")} Mot målet</h3>
       <div class="li"><span class="sw" style="background:var(--accent)"></span><span><span class="big">${fmtKm(done)}</span> <span class="muted">av ${total} km kjørt</span></span></div>
       <div class="li"><span class="sw" style="background:var(--ink)"></span><span><span class="big">${started?`Uke ${wkNo}`:"Uke 0"}</span> <span class="muted">av ${PLAN.length}</span></span></div>
       <p class="small" style="margin-top:10px">${status}</p>
@@ -663,14 +666,14 @@ function packSection(n){
   const i=dogInfo(n), lw=lastWeight(n), kg=pct=>lw?Math.round(lw.kg*pct/100*10)/10:null;
   const ageNote=i.born&&ageMonths(i.born)<18?`<p class="notice warnbox">${esc(n)} er ${ageText(ageMonths(i.born))}. Vent med vekt i kløven til hunden er minst 18 måneder.</p>`:"";
   const rule=`<p class="small muted" style="margin-top:8px"><b>Huskeregel:</b> ${esc(window.PACK_RULE)}</p>`;
-  if(!i.packStart)return `<h2>Kløvtrening</h2>${ageNote}
+  if(!i.packStart)return `${sh("backpack","Kløvtrening","dog")}${ageNote}
     <ul class="small" style="padding-left:20px;margin:6px 0">${window.PACK_INTRO.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>${rule}
     <p class="small muted" style="margin-top:8px">${esc(window.PACK_PREP)}</p>
     ${lw?"":`<p class="small muted" style="margin-top:8px">Legg inn vekten til ${esc(n)} over, så regnes kiloene ut for deg.</p>`}
     <div class="field"><label for="pk-start">Start uke 1</label><input id="pk-start" type="date" value="${iso(addDays(monday(todayD()),7))}"></div>
     <div class="actions"><button class="btn" id="pkStart">Start kløvplan (${PACK_PLAN.length} uker)</button></div>`;
   const cur=Math.floor((todayD()-parse(i.packStart))/864e5/7);
-  return `<div class="row" style="margin-top:28px"><h2 style="margin:0">Kløvplan</h2><button class="btn ghost sm" id="pkStop">Avslutt</button></div>
+  return `<div class="row" style="margin-top:28px">${sh("backpack","Kløvplan","dog","margin:0")}<button class="btn ghost sm" id="pkStop">Avslutt</button></div>
   <p class="small muted">Startet ${parse(i.packStart).toLocaleDateString("nb-NO",{day:"numeric",month:"long"})}${lw?` · regnet ut fra ${fmtKm(lw.kg)} kg`:" · legg inn vekt for å se kilo"}. Logg turene som «Kløvtur» eller «Kløvtrening» med vekt i kløven.</p>
   ${ageNote}${rule}
   <div class="pack">${PACK_PLAN.map((w,k)=>{const pw=packWeek(n,i.packStart,k),tk=kg(w.pct);
@@ -719,8 +722,8 @@ function feedOptions(sel){
 function feedSection(n){
   const i=dogInfo(n), need=feedNeed(n), log=activityFromLog(n), r10=v=>Math.round(v/10)*10;
   const fd=i.feedId&&i.feedId!=="custom"?feedById(i.feedId):null;
-  return `<h2>Fôring</h2>
-  ${need?`<div class="feedres"><div class="stats" style="grid-template-columns:repeat(${need.grams?2:1},1fr)"><div><span class="cond">${Math.round(need.kcal/10)*10}</span><small>kcal per dag</small></div>${need.grams?`<div><span class="cond">${r10(need.grams)} g</span><small>${esc(need.feed.name||need.feed.product)}</small></div>`:""}</div>
+  return `${sh("utensils","Fôring","dog")}
+  ${need?`<div class="feedres t-dog"><div class="stats" style="grid-template-columns:repeat(${need.grams?2:1},1fr)"><div><span class="cond">${Math.round(need.kcal/10)*10}</span><small>kcal per dag</small></div>${need.grams?`<div><span class="cond">${r10(need.grams)} g</span><small>${esc(need.feed.name||need.feed.product)}</small></div>`:""}</div>
    ${need.grams&&(need.adds.length||need.water)?`<table class="mixtab"><tr><th></th><th>Per dag</th><th>Per måltid</th></tr>
      <tr><td>${esc(need.feed.name||need.feed.product)} <span class="muted">(${Math.round(need.rest*100)} %)</span></td><td>${r10(need.grams)} g</td><td>${r10(need.grams/2)} g</td></tr>
      ${need.adds.map(m=>`<tr><td>${esc(m.feed.product)} <span class="muted">(${Math.round(m.share*100)} %)</span></td><td>${Math.round(m.grams/5)*5} g</td><td>${Math.round(m.grams/10)*5} g</td></tr>`).join("")}
@@ -758,7 +761,7 @@ function vDog(){
   <div class="stats"><div><span class="cond">${fmtKm(sum(mine,"km"))}</span><small>km totalt</small></div><div><span class="cond">${mine.length}</span><small>økter</small></div>
    <div><span class="cond">${lw?fmtKm(lw.kg):"–"}</span><small>kg</small></div><div><span class="cond">${lb?lb.bcs:"–"}</span><small>BCS</small></div></div>
 
-  <h2>Vekt og hold</h2>
+  ${sh("scale","Vekt og hold","health")}
   ${weightChart(ws)}
   <div class="field"><label for="w-d">Dato</label><input id="w-d" type="date" value="${iso(todayD())}"></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="w-kg">Vekt (kg)</label><input id="w-kg" inputmode="decimal" placeholder="0"></div>
@@ -769,13 +772,13 @@ function vDog(){
 
   ${feedSection(n)}
 
-  <h2>Belastning</h2>
+  ${sh("trending-up","Belastning","dog")}
   ${loadBox(dogLoad(n),v=>fmtKm(v)+" km")||`<p class="muted small">Logg noen økter, så ser du hvordan belastningen utvikler seg.</p>`}
   <div class="field"><label for="i-tol">Hvor mye tåler ${esc(n)} av økning?</label><select id="i-tol">${Object.entries(TOLERANCE).map(([k,v])=>`<option value="${k}" ${(i.tolerance||"normal")===k?"selected":""}>${v.t} – varsel ved ${Math.round((v.warn-1)*100)} % økning</option>`).join("")}</select></div>
   <p class="small muted" style="margin-top:6px">Sammenligner km siste 7 dager med snittet av de 4 ukene før. Veiledende: rase, alder, form og underlag gjør at hunder tåler ulikt. Velg «lav» for unge, eldre eller hunder som kommer tilbake etter skade.</p>
   ${packSection(n)}
 
-  <h2>Vaksinekort</h2>
+  ${sh("syringe","Vaksinekort","health")}
   ${vs.length?`<div class="list">${vs.map(v=>{const st=vaccineStatus(v);return `<div class="lrow"><span><b>${esc(vacName(v.type))}</b><br><span class="small muted">Gitt ${parse(v.d).toLocaleDateString("nb-NO")}${v.note?` · ${esc(v.note)}`:""}</span></span><span class="pill ${st.c}">${esc(st.t)}</span><button type="button" class="btn ghost sm" data-vdel="${esc(v.id)}" aria-label="Slett vaksine">Slett</button></div>`}).join("")}</div>`:`<p class="muted">Ingen vaksiner registrert.</p>`}
   <div class="field"><label for="v-type">Vaksine</label><select id="v-type">${VACCINES.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join("")}</select></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="v-d">Dato gitt</label><input id="v-d" type="date" value="${iso(todayD())}"></div>
@@ -784,7 +787,7 @@ function vDog(){
   <div class="actions"><button class="btn" id="vAdd">Legg til vaksine</button></div>
   <p class="small muted" style="margin-top:8px">NHF krever DHP (gyldig 3 år for hunder over 1 år) og anbefaler kennelhoste (1 år). Sjekk alltid gyldigheten i preparatomtalen, og husk karenstid før løp.</p>
 
-  <h2>ID og info</h2>
+  ${sh("info","ID og info","health")}
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="i-born">Født</label><input id="i-born" type="date" value="${esc(i.born||"")}"></div>
    <div><label for="i-sex">Kjønn</label><select id="i-sex">${["","Tispe","Hannhund"].map(x=>`<option ${i.sex===x?"selected":""} value="${x}">${x||"–"}</option>`).join("")}</select></div></div>
   <div class="field"><label for="i-breed">Rase</label><input id="i-breed" value="${esc(i.breed||"")}" maxlength="40" placeholder="F.eks. alaskan husky"></div>
@@ -839,18 +842,18 @@ function vLog(){
   const f=S.logFilter||"alle", all=f==="hund"?dogS():f==="meg"?meS():S.sessions;
   const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
   const tabs=`<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
-  if(!keys.length)return `<h2 style="margin-top:6px">Logg</h2>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
-  return `<h2 style="margin-top:6px">Logg</h2>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
+  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
+  return `${sh("list","Logg","plan","margin-top:6px")}${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
-      <span><span class="t">${esc(typeOf(s.type,s.kategori))}${s.rute?` <span class="muted" title="Har rute">· kart</span>`:""}${s.bilder&&s.bilder.length?` <span class="muted">· ${s.bilder.length} ${s.bilder.length===1?"bilde":"bilder"}</span>`:""}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
+      <span><span class="t"><span class="eico ${me?"t-me":"t-dog"}">${icon(me?"person-standing":"paw-print")}</span>${esc(typeOf(s.type,s.kategori))}${s.rute?` <span class="muted" title="Har rute">· kart</span>`:""}${s.bilder&&s.bilder.length?` <span class="muted">· ${s.bilder.length} ${s.bilder.length===1?"bilde":"bilder"}</span>`:""}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
       <span class="k">${s.km?fmtKm(s.km):""}</span></button>`}).join("")}</section>`}).join("");
 }
 
 function vPlan(){
   const t=todayD(),start=planStart(),doneDog=new Set(dogS().map(s=>s.dato)),doneAny=new Set(S.sessions.map(s=>s.dato)),bw=byWeek();
-  return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">${esc(TEMPLATES[planTypeFor(S.profile)].label)}-plan laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}.${grenFor(S.profile).snow?" ❄ = kjør på snø hvis mulig.":""} Trykk på en dag for å endre den.</p>`+
+  return `${sh("calendar-days","Plan frem mot løpet","plan","margin-top:6px")}<p class="muted">${esc(TEMPLATES[planTypeFor(S.profile)].label)}-plan laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}.${grenFor(S.profile).snow?" ❄ = kjør på snø hvis mulig.":""} Trykk på en dag for å endre den.</p>`+
   PLAN.map((wk,i)=>{const m=addDays(start,i*7),g=weekTotals(i),got=sum(bw[iso(m)]||[],"km");
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${got?`<span class="${got>=g.km?"hit":""}">${fmtKm(got)}</span> / `:""}${g.km} km</span></div><p class="phase">${esc(wk.f)} · ${fmtD(m)}–${fmtD(addDays(m,6))} · ${g.hm} hm</p>
     ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=it[3];
@@ -891,7 +894,7 @@ function grenInfo(g){
   <h3>Regler</h3><ul>${[...g.rules,...(window.COMMON_RULES||[])].map(r=>`<li>${esc(r)}</li>`).join("")}</ul>
   <h3>Tips</h3><ul>${g.tips.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>
   <p class="small muted">Fra NHFs konkurranseregler (25.08.2026) og vaksinasjonsreglement. Andre løp kan ha egne klasser og krav, så sjekk alltid løpsinvitasjonen. <a href="${esc(window.NHF_RULES_URL)}" target="_blank" rel="noopener">Les reglene hos NHF</a></p></details>
-  ${g.pulk?`<div class="calc"><h3>Pulkvekt</h3><p class="small muted">Pulken, med sele, drag og trekkreimer, skal veie minst hundenes vekt ganget med en faktor.</p>
+  ${g.pulk?`<div class="calc"><h3>${icon("scale","sm")} Pulkvekt</h3><p class="small muted">Pulken, med sele, drag og trekkreimer, skal veie minst hundenes vekt ganget med en faktor.</p>
    <div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><label for="pk-n">Antall hunder</label><select id="pk-n">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join("")}</select></div>
    <div><label for="pk-w">Hundenes vekt (kg)</label><input id="pk-w" inputmode="decimal" placeholder="Samlet vekt"></div></div>
    ${pulkDogChips()}
@@ -913,11 +916,11 @@ const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:ce
 function vSettings(){
   const p=S.profile;
   return `${S.isNew?`<p class="notice" style="margin-top:6px"><b>Velkommen!</b> Sett opp løpet du trener mot og hundene dine, så lages en plan for deg.</p>`:""}
-  <h2 style="margin-top:6px">Forsidebilde</h2>
+  ${sh("image","Forsidebilde","me","margin-top:6px")}
   <p class="muted">Et bilde av deg og hundene øverst på Oversikt.</p>
   ${p.cover?`<div class="cover small">${imgTag(p.cover,"","Forsidebilde")}</div>`:""}
   <div class="actions"><button type="button" class="btn line" id="coverBtn">${p.cover?"Bytt bilde":"Velg bilde"}</button>${p.cover?`<button type="button" class="btn ghost" id="coverRm">Fjern</button>`:""}</div><input type="file" id="coverFile" accept="image/*" hidden>
-  <h2>Målet ditt</h2>
+  ${sh("flag","Målet ditt","plan")}
   <p class="muted">Velg et løp fra kalenderen, eller fyll inn ditt eget. Treningsplanen på ${PLAN_WEEKS} uker lages ut fra løpet.</p>
   <div class="field"><label for="r-pick">Løp</label><select id="r-pick">${raceOptions(p.raceId)}</select></div>
   <div class="field" id="r-classWrap">${classSelect(p.raceId)}</div>
@@ -926,23 +929,23 @@ function vSettings(){
   <div class="field"><label for="race">Dato</label><input id="race" type="date" value="${esc(p.raceDate)}"></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="r-km">Distanse (km)</label><input id="r-km" inputmode="decimal" value="${esc(fmtKm(p.raceKm))}"></div>
    <div><label for="r-hm">Høydemeter</label><input id="r-hm" inputmode="numeric" value="${esc(p.raceHm||"")}" placeholder="Ukjent"></div></div>
-  <h2>Gren og klasse</h2>
+  ${sh("target","Gren og klasse","plan")}
   <p class="muted">Grenen bestemmer hvordan planen bygges opp, og hvilke regler som gjelder.</p>
   <div class="field"><label for="g-gren">Gren</label><select id="g-gren">${grenOptions(grenFor(p).id)}</select></div>
   <div class="field" id="g-classWrap">${grenClassSelect(grenFor(p),grenClass(p))}</div>
   <div class="field"><label for="r-plan">Plantype</label><select id="r-plan"><option value="" id="r-planAuto">Automatisk (${esc(TEMPLATES[grenFor(p).plan].label.toLowerCase())})</option>${Object.entries(TEMPLATES).map(([k,t])=>`<option value="${k}" ${p.planType===k?"selected":""}>${t.label}</option>`).join("")}</select></div>
   <div id="g-info">${grenInfo(grenFor(p))}</div>
-  <h2>Hundene</h2>
+  ${sh("paw-print","Hundene","dog")}
   <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
   <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
   <div class="actions" style="margin-top:12px"><button class="btn ghost" id="addDog">+ Legg til hund</button></div>
   <div class="actions"><button class="btn" id="saveSet">Lagre</button></div><p class="err" id="setErr" hidden></p>
-  <h2>Backup</h2>
+  ${sh("shield","Backup","plan")}
   <p class="muted">Last ned alle øktene som en fil, eller hent inn økter fra en tidligere backup. Økter som allerede finnes hoppes over.</p>
   <div class="actions"><button class="btn line" id="exportBtn">Last ned backup</button><button class="btn line" id="importBtn">Importer fil</button></div>
   <input type="file" id="importFile" accept="application/json,.json" hidden>
   <p class="err" id="impErr" hidden></p>
-  <h2>Konto</h2>
+  ${sh("user","Konto","plan")}
   <p class="muted">Innlogget som ${esc(S.user?.email||"")}</p>
   <div class="field"><label for="nick">Visningsnavn på føremeldinger</label><div class="row" style="align-items:center"><input id="nick" maxlength="30" value="${esc(p.nickname||"")}" placeholder="Valgfritt, ellers «Anonym»"><button type="button" class="btn ghost" id="nickSave">Lagre</button></div></div>
   <div class="actions"><button class="btn ghost" id="logoutBtn">Logg ut</button></div>
@@ -1281,6 +1284,9 @@ sheet.addEventListener("click",e=>{if(e.target===sheet)closeForm()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeForm()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh()});
 
+const NAV_ICONS={hjem:"house",logg:"list",plan:"calendar-days",innst:"user"};
+document.querySelectorAll(".tab").forEach(t=>{t.innerHTML=`${icon(NAV_ICONS[t.dataset.v])}<span>${t.textContent}</span>`});
+document.getElementById("addBtn").innerHTML=icon("plus");
 render();
 if(sb){
   sb.auth.onAuthStateChange((event,session)=>{
