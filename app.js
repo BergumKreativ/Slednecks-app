@@ -47,13 +47,24 @@ const TEMPLATES={
  ]},
 };
 const PLAN_WEEKS=11;
-const planTypeFor=p=>p.planType&&TEMPLATES[p.planType]?p.planType:(Number(p.raceKm)||0)<25?"sprint":(Number(p.raceKm)||0)>100?"lang":"mellom";
+// Gren lagres i race_type som "grenId|klasse". Eldre verdier (Slede/Barmark/Nordisk/Sprint) tolkes ut fra distansen.
+const GREN=id=>(window.GRENER||[]).find(g=>g.id===id);
+function grenFor(p){
+  const id=String(p.raceType||"").split("|")[0], km=Number(p.raceKm)||0;
+  if(GREN(id))return GREN(id);
+  if(id==="Barmark")return GREN("canicross");
+  if(id==="Nordisk")return GREN("pulk");
+  if(id==="Sprint"||km<25)return GREN("slede-sprint");
+  return GREN(km>100?"slede-ld":"slede-md");
+}
+const grenClass=p=>String(p.raceType||"").split("|")[1]||"";
+const planTypeFor=p=>p.planType&&TEMPLATES[p.planType]?p.planType:grenFor(p).plan;
 // PLAN[uke].d[dag] = [tekst, km, hm, nøkkeløkt, egen]
 let PLAN=[];
 function buildPlan(){
   const p=S.profile, t=TEMPLATES[planTypeFor(p)], raceKm=Number(p.raceKm)||t.base, raceHm=Number(p.raceHm)||0;
   const fk=t===TEMPLATES.lang?Math.min(1.5,Math.max(0.7,raceKm/t.base)):raceKm/t.base;
-  const perKm=raceKm?raceHm/raceKm:0, barmark=p.raceType==="Barmark", custom=p.planCustom||{}, start=planStart();
+  const perKm=raceKm?raceHm/raceKm:0, barmark=!grenFor(p).snow, custom=p.planCustom||{}, start=planStart();
   PLAN=t.weeks.map((w,wi)=>({f:w.f,d:w.d.map((x,di)=>{
     const own=custom[iso(addDays(start,wi*7+di))];
     if(own)return[own[0],Number(own[1])||0,Number(own[2])||0,0,1];
@@ -262,7 +273,7 @@ function vLog(){
 
 function vPlan(){
   const t=todayD(),start=planStart(),done=new Set(S.sessions.map(s=>s.dato)),bw=byWeek();
-  return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">${esc(TEMPLATES[planTypeFor(S.profile)].label)}-plan laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}.${S.profile.raceType==="Barmark"?"":" ❄ = kjør på snø hvis mulig."} Trykk på en dag for å endre den.</p>`+
+  return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">${esc(TEMPLATES[planTypeFor(S.profile)].label)}-plan laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}.${grenFor(S.profile).snow?" ❄ = kjør på snø hvis mulig.":""} Trykk på en dag for å endre den.</p>`+
   PLAN.map((wk,i)=>{const m=addDays(start,i*7),g=weekTotals(i),got=sum(bw[iso(m)]||[],"km");
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${got?`<span class="${got>=g.km?"hit":""}">${fmtKm(got)}</span> / `:""}${g.km} km</span></div><p class="phase">${esc(wk.f)} · ${fmtD(m)}–${fmtD(addDays(m,6))} · ${g.hm} hm</p>
     ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=it[3];
@@ -289,6 +300,32 @@ function raceSource(sel){
   if(!r)return "";
   return `${esc(r.place)} · ${esc(r.type)} · fra ${esc(r.src)} · <a href="${esc(r.url)}" target="_blank" rel="noopener">se løpet</a>${r.classes.length?"":" · distansen er ikke oppgitt, fyll inn selv"}`;
 }
+function grenOptions(sel){
+  const groups={};for(const g of window.GRENER||[])(groups[g.group]=groups[g.group]||[]).push(g);
+  return Object.entries(groups).map(([k,gs])=>`<optgroup label="${esc(k)}">${gs.map(g=>`<option value="${g.id}" ${g.id===sel?"selected":""}>${esc(g.name)}</option>`).join("")}</optgroup>`).join("");
+}
+function grenClassSelect(g,sel){
+  return `<label for="g-class">Klasse</label><select id="g-class"><option value="">Velg klasse</option>${g.classes.map(c=>`<option value="${esc(c.name)}" ${c.name===sel?"selected":""}>${esc(c.name)} · ${esc(c.dogs)} · ${kmRange(c.km)}</option>`).join("")}</select>`;
+}
+const kmRange=r=>r[0]===r[1]?`${fmtKm(r[0])} km`:`${fmtKm(r[0])}–${fmtKm(r[1])} km`;
+function grenInfo(g){
+  return `<details class="rules"><summary>Regler og tips: ${esc(g.name)}</summary>
+  <h3>Klasser i NM og GP</h3><ul>${g.classes.map(c=>`<li><b>${esc(c.name)}</b>: ${esc(c.dogs)}, ${kmRange(c.km)}</li>`).join("")}</ul>
+  <h3>Regler</h3><ul>${[...g.rules,...(window.COMMON_RULES||[])].map(r=>`<li>${esc(r)}</li>`).join("")}</ul>
+  <h3>Tips</h3><ul>${g.tips.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>
+  <p class="small muted">Fra NHFs konkurranseregler (25.08.2026) og vaksinasjonsreglement. Andre løp kan ha egne klasser og krav, så sjekk alltid løpsinvitasjonen. <a href="${esc(window.NHF_RULES_URL)}" target="_blank" rel="noopener">Les reglene hos NHF</a></p></details>
+  ${g.pulk?`<div class="calc"><h3>Pulkvekt</h3><p class="small muted">Pulken, med sele, drag og trekkreimer, skal veie minst hundenes vekt ganget med en faktor.</p>
+   <div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><label for="pk-n">Antall hunder</label><select id="pk-n">${[1,2,3,4,5].map(n=>`<option>${n}</option>`).join("")}</select></div>
+   <div><label for="pk-w">Hundenes vekt (kg)</label><input id="pk-w" inputmode="decimal" placeholder="Samlet vekt"></div></div>
+   <p class="notice" id="pk-out" aria-live="polite">Fyll inn hva hunden veier.</p></div>`:""}`;
+}
+function pulkText(n,w){
+  const f=(window.PULK_FACTORS||{})[n];
+  if(!(w>0)||!f)return "Fyll inn hva hunden veier.";
+  // Rund opp til hele 10 gram, så pulken aldri blir for lett
+  const kg=n=>n.toLocaleString("nb-NO",{maximumFractionDigits:2});
+  return `Pulken må veie minst <b>${kg(Math.ceil(w*f*100-1e-9)/100)} kg</b> (${kg(w)} kg × ${String(f).replace(".",",")}).`;
+}
 const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:center"><input class="dogin" data-orig="${esc(orig)}" value="${esc(name)}" maxlength="30" aria-label="Navn på hund" placeholder="Navn"><button type="button" class="btn ghost rmdog" aria-label="Fjern ${esc(name||"hund")}">Fjern</button></div>`;
 function vSettings(){
   const p=S.profile;
@@ -302,9 +339,12 @@ function vSettings(){
   <div class="field"><label for="race">Dato</label><input id="race" type="date" value="${esc(p.raceDate)}"></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="r-km">Distanse (km)</label><input id="r-km" inputmode="decimal" value="${esc(fmtKm(p.raceKm))}"></div>
    <div><label for="r-hm">Høydemeter</label><input id="r-hm" inputmode="numeric" value="${esc(p.raceHm||"")}" placeholder="Ukjent"></div></div>
-  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="r-type">Underlag</label><select id="r-type">${["Slede","Barmark","Nordisk","Sprint"].map(t=>`<option value="${t}" ${(p.raceType||"Slede")===t?"selected":""}>${t==="Sprint"?"Slede, sprint":t}</option>`).join("")}</select></div>
-   <div><label for="r-plan">Plantype</label><select id="r-plan"><option value="">Automatisk</option>${Object.entries(TEMPLATES).map(([k,t])=>`<option value="${k}" ${p.planType===k?"selected":""}>${t.label}</option>`).join("")}</select></div></div>
-  <p class="small muted" style="margin-top:6px">Automatisk: sprint under 25 km, langdistanse over 100 km, ellers mellomdistanse. Nå: ${TEMPLATES[planTypeFor(p)].label.toLowerCase()}.</p>
+  <h2>Gren og klasse</h2>
+  <p class="muted">Grenen bestemmer hvordan planen bygges opp, og hvilke regler som gjelder.</p>
+  <div class="field"><label for="g-gren">Gren</label><select id="g-gren">${grenOptions(grenFor(p).id)}</select></div>
+  <div class="field" id="g-classWrap">${grenClassSelect(grenFor(p),grenClass(p))}</div>
+  <div class="field"><label for="r-plan">Plantype</label><select id="r-plan"><option value="" id="r-planAuto">Automatisk (${esc(TEMPLATES[grenFor(p).plan].label.toLowerCase())})</option>${Object.entries(TEMPLATES).map(([k,t])=>`<option value="${k}" ${p.planType===k?"selected":""}>${t.label}</option>`).join("")}</select></div>
+  <div id="g-info">${grenInfo(grenFor(p))}</div>
   <h2>Hundene</h2>
   <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
   <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
@@ -440,7 +480,7 @@ function bind(){
     if(!(raceKm>0))return showErr("setErr",{message:"Skriv inn distansen på løpet i km."});
     const pick=document.getElementById("r-pick").value, cls=document.getElementById("r-class");
     const prof={...S.profile,raceDate:document.getElementById("race").value||S.profile.raceDate,raceName:document.getElementById("r-name").value.trim(),raceKm,raceHm,
-      raceId:pick?pick+(cls&&cls.value?"|"+cls.value:""):"",raceType:document.getElementById("r-type").value,planType:document.getElementById("r-plan").value,dogs};
+      raceId:pick?pick+(cls&&cls.value?"|"+cls.value:""):"",raceType:document.getElementById("g-gren").value+(document.getElementById("g-class").value?"|"+document.getElementById("g-class").value:""),planType:document.getElementById("r-plan").value,dogs};
     ss.disabled=true;
     try{
       ok(await sb.from("profiles").upsert({user_id:S.user.id,...profileRow(prof),updated_at:new Date().toISOString()}));
@@ -456,6 +496,22 @@ function bind(){
   document.querySelectorAll("[data-pdate]").forEach(b=>b.onclick=()=>openDay(b.dataset.pdate));
   const rs=document.getElementById("resetPlan");
   if(rs)rs.onclick=async()=>{if(!confirm("Fjerne alle egne endringer i planen?"))return;try{ok(await sb.from("profiles").update({plan_custom:{}}).eq("user_id",S.user.id));S.profile.planCustom={};render();toast("Planen er tilbakestilt")}catch(e){toast(errText(e))}};
+  const gs=document.getElementById("g-gren");
+  const bindGren=()=>{
+    const gc=document.getElementById("g-class"), g=GREN(gs.value);
+    gc.onchange=()=>{const c=g.classes.find(x=>x.name===gc.value);if(c&&!document.getElementById("r-pick").value)document.getElementById("r-km").value=fmtKm(c.km[1])};
+    const n=document.getElementById("pk-n"), w=document.getElementById("pk-w"), out=document.getElementById("pk-out");
+    if(n){const upd=()=>{out.innerHTML=pulkText(Number(n.value),num(w.value))};n.onchange=upd;w.oninput=upd}
+  };
+  function setGren(id){
+    const g=GREN(id);if(!g||!gs)return;
+    gs.value=id;
+    document.getElementById("g-classWrap").innerHTML=grenClassSelect(g,"");
+    document.getElementById("g-info").innerHTML=grenInfo(g);
+    document.getElementById("r-planAuto").textContent=`Automatisk (${TEMPLATES[g.plan].label.toLowerCase()})`;
+    bindGren();
+  }
+  if(gs){gs.onchange=()=>setGren(gs.value);bindGren()}
   const rp=document.getElementById("r-pick");
   if(rp){
     const fillClass=()=>{
@@ -464,6 +520,7 @@ function bind(){
       document.getElementById("r-km").value=fmtKm(k.km);
       document.getElementById("r-hm").value=k.hm||"";
       document.getElementById("r-name").value=r.classes.length>1?`${r.name} – ${k.name}`:r.name;
+      if(r.type==="Slede")setGren(k.km>100?"slede-ld":k.km<25?"slede-sprint":"slede-md");
     };
     const bindClass=()=>{const c=document.getElementById("r-class");if(c)c.onchange=fillClass};
     rp.onchange=()=>{
@@ -474,7 +531,7 @@ function bind(){
       if(!r)return;
       document.getElementById("r-name").value=r.name;
       document.getElementById("race").value=r.date;
-      document.getElementById("r-type").value=r.type;
+      setGren({Sprint:"slede-sprint",Nordisk:"pulk",Barmark:"canicross"}[r.type]||document.getElementById("g-gren").value);
       if(r.classes.length===1){document.getElementById("r-class").value=r.classes[0].name;fillClass()}
       else{document.getElementById("r-km").value="";document.getElementById("r-hm").value=""}
     };

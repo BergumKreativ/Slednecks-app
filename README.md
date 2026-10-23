@@ -29,3 +29,7 @@ Legg mappa i et GitHub-repo, og slå på Settings → Pages → *Deploy from a b
 Registrering er stengt (Supabase → Authentication → Sign In / Providers → *Allow new users to sign up* er av). Nye brukere legges til under Authentication → Users → *Add user* → *Send invitation*. Hver bruker har sin egen logg.
 
 Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hunder under **Profil**. Løp kan velges fra kalenderen i [races.js](races.js) (hentet fra liverace.app og sleddog.no – oppdater før hver sesong). Treningsplanen på 11 uker velges etter distanse (sprint < 25 km, langdistanse > 100 km, ellers mellomdistanse; malene ligger i `TEMPLATES` i `app.js`) og skaleres etter løpet. Hver dag i planen kan endres under Plan; endringene lagres i `plan_custom`.
+
+## Grener og regler
+
+[disciplines.js](disciplines.js) har grener, NM/GP-klasser, regler, tips og pulkvektfaktorer fra NHFs konkurranseregler (25.08.2026) og ID- og vaksinasjonsreglement (18.11.2022). Oppdater når NHF endrer reglene.
