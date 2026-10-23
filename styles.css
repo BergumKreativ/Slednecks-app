@@ -234,6 +234,23 @@ body.anon main{padding-bottom:40px}
 .gpxrow .btn{width:100%}
 .leaflet-container{font:inherit}
 
+.feedres{border:1.5px solid var(--accent);border-radius:18px;padding:12px 14px;margin-top:8px}
+.feedres .stats{margin-top:0}
+
+/* Bilder */
+.cover{margin:-18px -18px 18px;height:200px;overflow:hidden;background:var(--soft)}
+.cover img{width:100%;height:100%;object-fit:cover;display:block}
+.cover.small{margin:8px 0 0;height:140px;border-radius:18px}
+.avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;display:block;margin-bottom:6px;background:var(--soft)}
+.avatar.lg{width:88px;height:88px;margin:0;flex:0 0 auto}
+.avatar.empty{display:flex;align-items:center;justify-content:center;font-family:"Barlow Condensed",sans-serif;font-size:2.4rem;font-weight:700;color:var(--muted)}
+.doghead{display:flex;gap:16px;align-items:center;margin-top:12px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.thumb{position:relative;width:76px;height:76px;border-radius:14px;overflow:hidden;background:var(--soft);border:1.5px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
+.thumb button{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-weight:700;cursor:pointer;line-height:1}
+.thumb.addimg{display:flex;align-items:center;justify-content:center;font-size:2rem;color:var(--muted);cursor:pointer;font-family:inherit}
+
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center}

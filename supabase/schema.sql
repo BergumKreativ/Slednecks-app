@@ -46,8 +46,29 @@ alter table public.okter add column if not exists rh   numeric;
 -- Rute fra GPX: [[lat, lon, høyde], …] forenklet til maks ~500 punkter. kilde = 'gpx' (senere 'strava', 'gps')
 alter table public.okter add column if not exists rute  jsonb;
 alter table public.okter add column if not exists kilde text not null default '';
+-- Bilder fra økta: liste med stier i lagringsbøtta «bilder»
+alter table public.okter add column if not exists bilder jsonb not null default '[]'::jsonb;
+
+-- Privat bildelagring. Hver bruker har sin egen mappe: <bruker-id>/…
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('bilder', 'bilder', false, 5242880, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do nothing;
+drop policy if exists "egne bilder lese" on storage.objects;
+create policy "egne bilder lese" on storage.objects for select to authenticated
+  using (bucket_id = 'bilder' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "egne bilder laste opp" on storage.objects;
+create policy "egne bilder laste opp" on storage.objects for insert to authenticated
+  with check (bucket_id = 'bilder' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "egne bilder endre" on storage.objects;
+create policy "egne bilder endre" on storage.objects for update to authenticated
+  using (bucket_id = 'bilder' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "egne bilder slette" on storage.objects;
+create policy "egne bilder slette" on storage.objects for delete to authenticated
+  using (bucket_id = 'bilder' and (storage.foldername(name))[1] = auth.uid()::text);
 -- Egne mål: [{ id, name, type, km, hm, kg, date }]
 alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
+-- Forsidebilde på Oversikt (sti i bøtta «bilder»)
+alter table public.profiles add column if not exists cover text not null default '';
 
 -- Tilbakemeldinger fra testbrukere. Leses i Supabase → Table Editor. Blir liggende uten bruker-ID hvis kontoen slettes.
 create table if not exists public.tilbakemeldinger (

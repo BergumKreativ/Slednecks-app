@@ -108,16 +108,16 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
 const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
-const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||""});
+const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
 const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="velkommen";
@@ -229,6 +229,38 @@ function goalRow(label,done,goal,fmt,unit){
   <div class="bar" role="img" aria-label="${label}: ${Math.round(pct)} prosent"><span style="width:${pct}%"></span></div><p class="small muted" style="margin-top:3px">${label}</p></div>`;
 }
 
+/* Bilder lagres privat i Supabase Storage (bøtta «bilder») under <bruker-id>/… og vises med lenker som varer en time.
+   Før opplasting skaleres bildet ned og lagres som JPEG. Det sparer plass og fjerner posisjonsdata (EXIF) fra kameraet. */
+const IMG={urls:{},pending:{}};
+async function shrink(file,max){
+  let img=await createImageBitmap(file,{imageOrientation:"from-image"}).catch(()=>null);
+  if(!img)img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("Bildet kunne ikke leses."));i.src=URL.createObjectURL(file)});
+  const f=Math.min(1,max/Math.max(img.width,img.height)), c=document.createElement("canvas");
+  c.width=Math.round(img.width*f);c.height=Math.round(img.height*f);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,"image/jpeg",0.82));
+}
+async function uploadImage(file,folder,max){
+  const blob=await shrink(file,max), path=`${S.user.id}/${folder}/${newId()}.jpg`;
+  ok(await sb.storage.from("bilder").upload(path,blob,{contentType:"image/jpeg"}));
+  IMG.urls[path]={url:URL.createObjectURL(blob),exp:Date.now()+3500e3};
+  return path;
+}
+async function removeImages(paths){paths=(paths||[]).filter(Boolean);if(paths.length)await sb.storage.from("bilder").remove(paths)}
+let urlTimer=null;
+function loadImgs(){
+  document.querySelectorAll("img[data-path]").forEach(i=>{const c=IMG.urls[i.dataset.path];if(c&&c.exp>Date.now()){if(i.src!==c.url)i.src=c.url}else IMG.pending[i.dataset.path]=1});
+  if(!Object.keys(IMG.pending).length||!sb)return;
+  clearTimeout(urlTimer);urlTimer=setTimeout(async()=>{
+    const paths=Object.keys(IMG.pending);IMG.pending={};
+    const r=await sb.storage.from("bilder").createSignedUrls(paths,3600);
+    (r.data||[]).forEach(x=>{if(x.signedUrl)IMG.urls[x.path]={url:x.signedUrl,exp:Date.now()+3500e3}});
+    document.querySelectorAll("img[data-path]").forEach(i=>{const c=IMG.urls[i.dataset.path];if(c)i.src=c.url});
+  },20);
+}
+const imgTag=(path,cls,alt)=>`<img class="${cls}" data-path="${esc(path)}" alt="${esc(alt||"")}">`;
+const allImagePaths=()=>[...S.sessions.flatMap(s=>s.bilder||[]),...Object.values(S.profile.dogInfo||{}).map(i=>i.photo),S.profile.cover].filter(Boolean);
+
 function vHome(){
   const t=todayD(), race=parse(S.profile.raceDate), days=Math.round((race-t)/864e5);
   const bw=byWeek(), mon=monday(t), wk=bw[iso(mon)]||[], idx=planWeekIdx(t), pd=planDay(t);
@@ -244,6 +276,7 @@ function vHome(){
   let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&dogS().some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `<div class="home">
+  ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   <section class="hero">${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
   ${progressCard(t)}
   ${trail(bw,t)}
@@ -537,12 +570,59 @@ function packSection(n){
      ${!w.rest&&(pw.km||k<=cur)?`<p class="small ${done?"badge-ok":"muted"}">${done?"✓ ":""}Gått ${fmtKm(pw.km)} av ${w.km} km${pw.maxKg?` · tyngst ${fmtKm(pw.maxKg)} kg`:""}${!okKg&&pw.km?" · for lite vekt":""}</p>`:""}</div>`}).join("")}
    <div class="pweek badge"><b>Neste sesong: ${window.PACK_GOLD.badge}merket</b><p class="small">${esc(window.PACK_GOLD.text)}${kg(25)?` (${fmtKm(kg(25))} kg)`:""}</p><p class="small muted">${esc(window.PACK_GOLD.note)}</p></div></div>`;
 }
+/* Fôrkalkulator: hvileenergi (RER = 70 × kg^0,75) × aktivitetsfaktor. Fôr fra feeds.js eller eget tall fra sekken. */
+const ACTIVITY=[
+  {id:"lite",t:"Rolig eller eldre hund",f:1.4,fn:1.2},
+  {id:"normal",t:"Vanlig aktiv, daglige turer",f:1.8,fn:1.6},
+  {id:"aktiv",t:"Trener 1–2 timer om dagen",f:2.5},
+  {id:"hard",t:"Hard trening, sledehund i sesong",f:4},
+  {id:"ekstrem",t:"Langdistanseløp eller streng kulde",f:7},
+];
+function activityFromLog(n){
+  const from=addDays(todayD(),-13), km=sum(dogS().filter(s=>(s.hunder||[]).includes(n)&&parse(s.dato)>=from),"km")/14;
+  return {km,id:km<1?"lite":km<3?"normal":km<8?"aktiv":km<18?"hard":"ekstrem"};
+}
+const feedById=id=>(window.FEEDS||[]).find(f=>f.id===id);
+function feedNeed(n){
+  const i=dogInfo(n), lw=lastWeight(n);
+  if(!lw)return null;
+  const a=ACTIVITY.find(x=>x.id===(i.activity||"normal"))||ACTIVITY[1];
+  const factor=i.neutered&&a.fn?a.fn:a.f, rer=70*Math.pow(lw.kg,0.75), lb=byDateDesc(i.weights).find(w=>w.bcs);
+  const adj=lb&&lb.bcs>=6?0.9:lb&&lb.bcs<=3?1.1:1;
+  const kcal=rer*factor*adj, fd=i.feedId==="custom"?{name:i.feedName||"Eget fôr",kcal100:Number(i.feedKcal)||0}:feedById(i.feedId);
+  return {kg:lw.kg,rer,factor,adj,kcal,bcs:lb&&lb.bcs,feed:fd,grams:fd&&fd.kcal100?kcal/fd.kcal100*100:null};
+}
+function feedOptions(sel){
+  const groups={};for(const f of window.FEEDS||[])(groups[f.brand]=groups[f.brand]||[]).push(f);
+  return `<option value="">Velg fôr</option>`+Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0],"nb")).map(([b,fs])=>`<optgroup label="${esc(b)}">${fs.map(f=>`<option value="${esc(f.id)}" ${f.id===sel?"selected":""}>${esc(f.product)} · ${f.kcal100} kcal/100 g</option>`).join("")}</optgroup>`).join("")+`<option value="custom" ${sel==="custom"?"selected":""}>Annet fôr – skriv inn selv</option>`;
+}
+function feedSection(n){
+  const i=dogInfo(n), need=feedNeed(n), log=activityFromLog(n), r10=v=>Math.round(v/10)*10;
+  const fd=i.feedId&&i.feedId!=="custom"?feedById(i.feedId):null;
+  return `<h2>Fôring</h2>
+  ${need?`<div class="feedres"><div class="stats" style="grid-template-columns:repeat(${need.grams?2:1},1fr)"><div><span class="cond">${Math.round(need.kcal/10)*10}</span><small>kcal per dag</small></div>${need.grams?`<div><span class="cond">${r10(need.grams)} g</span><small>${esc(need.feed.name||need.feed.product)} per dag</small></div>`:""}</div>
+   ${need.grams?`<p class="small" style="margin-top:8px">Fordelt på to måltider: <b>${r10(need.grams/2)} g</b> morgen og kveld.</p>`:`<p class="small muted" style="margin-top:8px">Velg fôr under, så regnes det om til gram.</p>`}
+   ${need.adj!==1?`<p class="small warntext">${need.adj<1?`BCS ${need.bcs}: redusert med 10 % til ${esc(n)} er ved ideell vekt.`:`BCS ${need.bcs}: økt med 10 % til ${esc(n)} har fått litt mer hold.`}</p>`:""}
+   <p class="small muted">${fmtKm(need.kg)} kg · hvileenergi ${Math.round(need.rer)} kcal × ${String(need.factor).replace(".",",")}${need.adj!==1?` × ${String(need.adj).replace(".",",")}`:""}</p></div>`
+  :`<p class="small muted">Legg inn vekten til ${esc(n)} under «Vekt og hold», så regnes fôrmengden ut.</p>`}
+  <div class="field"><label for="fd-act">Aktivitetsnivå</label><select id="fd-act">${ACTIVITY.map(a=>`<option value="${a.id}" ${(i.activity||"normal")===a.id?"selected":""}>${a.t}</option>`).join("")}</select></div>
+  ${log.km>0?`<p class="small muted" style="margin-top:4px">Ut fra loggen siste 2 uker (${fmtKm(log.km)} km per dag) passer «${esc(ACTIVITY.find(a=>a.id===log.id).t.toLowerCase())}».</p>`:""}
+  <div class="field"><label><input type="checkbox" id="fd-neu" ${i.neutered?"checked":""} style="width:auto;margin-right:8px">Kastrert eller sterilisert</label></div>
+  <div class="field"><label for="fd-feed">Fôr</label><select id="fd-feed">${feedOptions(i.feedId||"")}</select></div>
+  ${i.feedId==="custom"?`<div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="fd-name">Navn</label><input id="fd-name" value="${esc(i.feedName||"")}" maxlength="50" placeholder="Fôrets navn"></div>
+   <div><label for="fd-kcal">kcal per 100 g</label><input id="fd-kcal" inputmode="decimal" value="${esc(i.feedKcal||"")}" placeholder="Står på sekken"></div></div>
+   <p class="small muted" style="margin-top:4px">Står energien i MJ per kg, gang med 23,9 for å få kcal per 100 g.</p>`:""}
+  ${fd&&fd.url?`<p class="small muted" style="margin-top:4px">Energiinnhold fra <a href="${esc(fd.url)}" target="_blank" rel="noopener">produsenten</a>. Sjekk sekken, oppskrifter endres.</p>`:""}
+  <div class="actions"><button class="btn" id="fdSave">Lagre fôring</button></div>
+  <p class="small muted" style="margin-top:8px">Veiledende: behovet varierer mye mellom hunder. Juster etter holdet (BCS) og vekten over tid. Gi gjerne litt ekstra på dager med lange turer og i kulde. Snacks teller også med.</p>`;
+}
 function vDog(){
   const n=S.dog, i=dogInfo(n), ws=byDateDesc(i.weights), vs=byDateDesc(i.vaccines), warn=dogWarnings(n);
   const mine=S.sessions.filter(s=>(s.hunder||[]).includes(n)), lw=ws.find(w=>w.kg), lb=ws.find(w=>w.bcs);
   const facts=[i.sex,i.breed,i.born?ageText(ageMonths(i.born)):""].filter(Boolean);
   return `<div class="actions" style="margin-top:4px"><button class="btn ghost" id="dogBack">← Tilbake</button></div>
-  <h1 class="cond" style="font-size:2.6rem;margin-top:12px">${esc(n)}</h1>
+  <div class="doghead">${i.photo?imgTag(i.photo,"avatar lg",n):`<div class="avatar lg empty">${esc(n.slice(0,1).toUpperCase())}</div>`}
+   <div><h1 class="cond" style="font-size:2.6rem">${esc(n)}</h1><button type="button" class="linkbtn small" id="dogPhotoBtn">${i.photo?"Bytt bilde":"Legg til bilde"}</button><input type="file" id="dogPhoto" accept="image/*" hidden></div></div>
   <p class="muted">${facts.length?facts.map(esc).join(" · "):"Fyll inn info om hunden lenger ned."}</p>
   ${warn.length?`<div class="notice warnbox"><b>Sjekk før løpet</b><ul>${warn.map(w=>`<li>${esc(w)}</li>`).join("")}</ul></div>`:`<p class="notice okbox">✓ Chip og vaksiner er i orden for løpet.</p>`}
   <div class="stats"><div><span class="cond">${fmtKm(sum(mine,"km"))}</span><small>km totalt</small></div><div><span class="cond">${mine.length}</span><small>økter</small></div>
@@ -556,6 +636,8 @@ function vDog(){
   <div class="actions"><button class="btn" id="wAdd">Legg til måling</button></div>
   <p class="small muted" style="margin-top:8px">BCS (body condition score) går fra 1 til 9, der 4–5 er ideelt. Du skal lett kunne kjenne ribbeina, og se en tydelig midje ovenfra.</p>
   ${ws.length?`<div class="list">${ws.map(w=>`<div class="lrow"><span>${fmtD(parse(w.d))} ${parse(w.d).getFullYear()}</span><span>${w.kg?`<b>${fmtKm(w.kg)} kg</b>`:""}${w.bcs?` · BCS ${w.bcs}`:""}</span><button type="button" class="btn ghost sm" data-wdel="${esc(w.id)}" aria-label="Slett måling">Slett</button></div>`).join("")}</div>`:""}
+
+  ${feedSection(n)}
 
   <h2>Belastning</h2>
   ${loadBox(dogLoad(n),v=>fmtKm(v)+" km")||`<p class="muted small">Logg noen økter, så ser du hvordan belastningen utvikler seg.</p>`}
@@ -589,7 +671,7 @@ function dogCard(n){
   const longest=mine.reduce((a,s)=>Math.max(a,Number(s.km)||0),0);
   const moods=mine.map(s=>s.motivasjon&&s.motivasjon[n]).filter(Boolean).slice(0,6).reverse();
   const warn=dogWarnings(n), lw=lastWeight(n);
-  return `<button type="button" class="dog" data-dogpage="${esc(n)}"><div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
+  return `<button type="button" class="dog" data-dogpage="${esc(n)}">${dogInfo(n).photo?imgTag(dogInfo(n).photo,"avatar",n):""}<div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
     <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}${lw?`<br>${fmtKm(lw.kg)} kg${lw.bcs?` · BCS ${lw.bcs}`:""}`:""}</p>
     ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}
     ${warn.length?`<p class="small dogwarn">⚠ ${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}
@@ -632,7 +714,7 @@ function vLog(){
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
-      <span><span class="t">${esc(typeOf(s.type,s.kategori))}${s.rute?` <span class="muted" title="Har rute">· kart</span>`:""}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
+      <span><span class="t">${esc(typeOf(s.type,s.kategori))}${s.rute?` <span class="muted" title="Har rute">· kart</span>`:""}${s.bilder&&s.bilder.length?` <span class="muted">· ${s.bilder.length} ${s.bilder.length===1?"bilde":"bilder"}</span>`:""}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
       <span class="k">${s.km?fmtKm(s.km):""}</span></button>`}).join("")}</section>`}).join("");
 }
 
@@ -701,7 +783,11 @@ const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:ce
 function vSettings(){
   const p=S.profile;
   return `${S.isNew?`<p class="notice" style="margin-top:6px"><b>Velkommen!</b> Sett opp løpet du trener mot og hundene dine, så lages en plan for deg.</p>`:""}
-  <h2 style="margin-top:6px">Målet ditt</h2>
+  <h2 style="margin-top:6px">Forsidebilde</h2>
+  <p class="muted">Et bilde av deg og hundene øverst på Oversikt.</p>
+  ${p.cover?`<div class="cover small">${imgTag(p.cover,"","Forsidebilde")}</div>`:""}
+  <div class="actions"><button type="button" class="btn line" id="coverBtn">${p.cover?"Bytt bilde":"Velg bilde"}</button>${p.cover?`<button type="button" class="btn ghost" id="coverRm">Fjern</button>`:""}</div><input type="file" id="coverFile" accept="image/*" hidden>
+  <h2>Målet ditt</h2>
   <p class="muted">Velg et løp fra kalenderen, eller fyll inn ditt eget. Treningsplanen på ${PLAN_WEEKS} uker lages ut fra løpet.</p>
   <div class="field"><label for="r-pick">Løp</label><select id="r-pick">${raceOptions(p.raceId)}</select></div>
   <div class="field" id="r-classWrap">${classSelect(p.raceId)}</div>
@@ -773,7 +859,7 @@ function openForm(s,kat){
   if(!F.min)F.min="";if(!F.hm)F.hm="";
   sheet.classList.add("open");draw();
 }
-function closeForm(){sheet.classList.remove("open");editing=null;if(fMap){fMap.remove();fMap=null}}
+function closeForm(){sheet.classList.remove("open");editing=null;if(fMap){fMap.remove();fMap=null}if(F&&F._new&&F._new.length){removeImages(F._new).catch(()=>{});F._new=[]}}
 function draw(){
   const me=F.kategori==="meg", dogs=Array.from(new Set([...S.profile.dogs,...F.hunder])), pd=planDay(parse(F.dato||iso(new Date())));
   panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">${editing?"Endre økt":"Ny økt"}</h2><button class="btn ghost" id="fClose">Lukk</button></div>
@@ -783,6 +869,8 @@ function draw(){
    ${F.rute?"":`<p class="small muted" style="margin-top:6px">Eksporter turen som GPX fra klokka, Strava, Garmin Connect, Komoot eller UT.no. Distanse, høydemeter, tid og dato fylles ut.</p>`}</div>
   ${F.rute?`<div id="f-map" class="map" role="img" aria-label="Kart over ruta"></div><p class="small muted" style="margin-top:6px">${F.rute.length} punkter · <button type="button" class="linkbtn" id="gpxRemove">Fjern ruta</button></p>`:""}
   <p class="err" id="gpxErr" hidden></p>
+  <div class="field"><span class="flabel">Bilder</span><div class="thumbs">${(F.bilder||[]).map(p=>`<span class="thumb">${imgTag(p,"","Bilde fra økta")}<button type="button" data-rmimg="${esc(p)}" aria-label="Fjern bilde">×</button></span>`).join("")}
+   <button type="button" class="thumb addimg" id="imgBtn" aria-label="Legg til bilder">+</button></div><input type="file" id="imgFile" accept="image/*" multiple hidden></div>
   <div class="field"><label for="f-dato">Dato</label><input id="f-dato" type="date" value="${esc(F.dato)}"></div>
   <div class="field"><span class="flabel">Type økt</span><div class="chips">${(me?MY_TYPES:TYPES).map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")}</div></div>
   <div class="field grid3"><div><label for="f-km">Km</label><input id="f-km" inputmode="decimal" value="${esc(F.km)}" placeholder="0"></div>
@@ -800,6 +888,13 @@ function draw(){
   <div class="actions">${editing?`<button class="btn del" id="fDel">Slett</button>`:""}<button class="btn" id="fSave">${editing?"Lagre endringer":"Lagre økt"}</button></div>`;
   const keep=()=>{const kgEl=panel.querySelector("#f-kg");if(kgEl)F.last_kg=kgEl.value;F.temp=panel.querySelector("#f-temp").value;F.rh=panel.querySelector("#f-rh").value;F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
   panel.querySelector("#fClose").onclick=closeForm;
+  loadImgs();
+  const imf=panel.querySelector("#imgFile");
+  panel.querySelector("#imgBtn").onclick=()=>imf.click();
+  imf.onchange=async()=>{const files=[...imf.files];if(!files.length)return;keep();toast(`Laster opp ${files.length} ${files.length===1?"bilde":"bilder"} …`);
+    try{for(const f of files.slice(0,8)){const p=await uploadImage(f,"okter",1600);F.bilder=[...(F.bilder||[]),p];F._new=[...(F._new||[]),p]}draw()}catch(e){showErr("fErr",e);draw()}};
+  panel.querySelectorAll("[data-rmimg]").forEach(b=>b.onclick=()=>{keep();const p=b.dataset.rmimg;F.bilder=F.bilder.filter(x=>x!==p);F._gone=[...(F._gone||[]),p];draw()});
+  panel.querySelectorAll(".thumb img").forEach(im=>im.onclick=()=>{if(im.src)window.open(im.src,"_blank","noopener")});
   if(fMap){fMap.remove();fMap=null}
   if(F.rute)fMap=drawRoute(panel.querySelector("#f-map"),F.rute);
   const gf=panel.querySelector("#gpxFile");
@@ -814,7 +909,7 @@ function draw(){
   panel.querySelectorAll("[data-dog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.dog;if(F.hunder.includes(d)){F.hunder=F.hunder.filter(x=>x!==d);delete F.motivasjon[d]}else F.hunder=[...F.hunder,d];draw()});
   panel.querySelectorAll("[data-mdog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.mdog,v=Number(b.dataset.m);if(F.motivasjon[d]===v)delete F.motivasjon[d];else F.motivasjon[d]=v;draw()});
   panel.querySelector("#fSave").onclick=async()=>{keep();await save()};
-  const del=panel.querySelector("#fDel");if(del)del.onclick=async()=>{if(!confirm("Slette denne økta?"))return;try{ok(await sb.from("okter").delete().eq("id",editing.id));closeForm();toast("Økta er slettet");await refresh()}catch(e){showErr("fErr",e)}};
+  const del=panel.querySelector("#fDel");if(del)del.onclick=async()=>{if(!confirm("Slette denne økta?"))return;try{ok(await sb.from("okter").delete().eq("id",editing.id));removeImages([...(editing.bilder||[]),...(F._new||[])]).catch(()=>{});F._new=[];closeForm();toast("Økta er slettet");await refresh()}catch(e){showErr("fErr",e)}};
 }
 function openDay(date){
   const pd=planDay(parse(date)), it=pd.item, own=(S.profile.planCustom||{})[date], d=parse(date);
@@ -840,7 +935,7 @@ function openDay(date){
   const r=panel.querySelector("#dReset");if(r)r.onclick=()=>put(null);
 }
 const num=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:0};
-const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null,temp:String(s.temp??"").trim()!==""?num(s.temp):null,rh:String(s.rh??"").trim()!==""?Math.round(num(s.rh)):null,rute:s.rute||null,kilde:s.rute?s.kilde||"gpx":""}};
+const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null,temp:String(s.temp??"").trim()!==""?num(s.temp):null,rh:String(s.rh??"").trim()!==""?Math.round(num(s.rh)):null,rute:s.rute||null,kilde:s.rute?s.kilde||"gpx":"",bilder:s.bilder||[]}};
 async function save(){
   if(!F.dato)return showErr("fErr",{message:"Velg en dato."});
   if(!num(F.km)&&!num(F.min)&&!F.kommentar.trim())return showErr("fErr",{message:"Skriv inn km, minutter eller en kommentar."});
@@ -848,6 +943,7 @@ async function save(){
   const btn=document.getElementById("fSave");btn.disabled=true;
   try{
     ok(editing?await sb.from("okter").update(body).eq("id",editing.id):await sb.from("okter").insert(body));
+    const gone=F._gone||[];F._new=[];F._gone=[];removeImages(gone).catch(()=>{});
     const was=editing;closeForm();toast(was?"Endringene er lagret":"Økta er lagret");await refresh();
   }catch(e){btn.disabled=false;showErr("fErr",e)}
 }
@@ -862,6 +958,9 @@ function toast(t){const el=document.getElementById("toast");el.textContent=t;el.
 function bindDog(){
   const n=S.dog, $=id=>document.getElementById(id);
   const save=async(info,msg)=>{try{await saveDogInfo(n,info);render();toast(msg)}catch(e){showErr("dogErr",e)}};
+  $("dogPhotoBtn").onclick=()=>$("dogPhoto").click();
+  $("dogPhoto").onchange=async()=>{const f=$("dogPhoto").files[0];if(!f)return;toast("Laster opp …");
+    try{const old=dogInfo(n).photo,path=await uploadImage(f,"hunder",800);await save({...dogInfo(n),photo:path},"Bildet er lagret");removeImages([old]).catch(()=>{})}catch(e){showErr("dogErr",e)}};
   $("dogBack").onclick=()=>{S.view="hjem";render();window.scrollTo(0,0)};
   $("wAdd").onclick=()=>{
     const kg=num($("w-kg").value), bcs=Number($("w-bcs").value)||0;
@@ -877,6 +976,12 @@ function bindDog(){
   };
   document.querySelectorAll("[data-vdel]").forEach(b=>b.onclick=()=>{if(!confirm("Slette denne vaksinen?"))return;const i=dogInfo(n);save({...i,vaccines:(i.vaccines||[]).filter(v=>v.id!==b.dataset.vdel)},"Vaksinen er slettet")});
   const ps=$("pkStart");if(ps)ps.onclick=()=>{const d=$("pk-start").value;if(!d)return showErr("dogErr",{message:"Velg når uke 1 starter."});save({...dogInfo(n),packStart:iso(monday(parse(d)))},"Kløvplanen er startet")};
+  const fdFeed=$("fd-feed");
+  if(fdFeed){
+    const collect=()=>({...dogInfo(n),activity:$("fd-act").value,neutered:$("fd-neu").checked,feedId:fdFeed.value,feedName:$("fd-name")?$("fd-name").value.trim():dogInfo(n).feedName,feedKcal:$("fd-kcal")?num($("fd-kcal").value):dogInfo(n).feedKcal});
+    fdFeed.onchange=()=>{if(fdFeed.value==="custom")save(collect(),"Skriv inn energien fra sekken")};
+    $("fdSave").onclick=()=>{const v=collect();if(v.feedId==="custom"&&!(v.feedKcal>0))return showErr("dogErr",{message:"Skriv inn kcal per 100 g fra sekken."});save(v,"Fôringen er lagret")};
+  }
   $("i-tol").onchange=()=>save({...dogInfo(n),tolerance:$("i-tol").value},"Lagret");
   const pst=$("pkStop");if(pst)pst.onclick=()=>{if(!confirm("Avslutte kløvplanen? Øktene dine blir liggende."))return;const i={...dogInfo(n)};delete i.packStart;save(i,"Kløvplanen er avsluttet")};
   $("iSave").onclick=()=>{
@@ -907,6 +1012,11 @@ async function importData(file){
 }
 
 function bind(){
+  loadImgs();
+  const cb=document.getElementById("coverBtn"),cf=document.getElementById("coverFile");
+  if(cb){cb.onclick=()=>cf.click();cf.onchange=async()=>{const f=cf.files[0];if(!f)return;toast("Laster opp …");
+    try{const old=S.profile.cover,path=await uploadImage(f,"forside",1600);ok(await sb.from("profiles").update({cover:path}).eq("user_id",S.user.id));S.profile.cover=path;render();toast("Forsidebildet er lagret");removeImages([old]).catch(()=>{})}catch(e){toast(errText(e))}}}
+  const cr=document.getElementById("coverRm");if(cr)cr.onclick=async()=>{const old=S.profile.cover;try{ok(await sb.from("profiles").update({cover:""}).eq("user_id",S.user.id));S.profile.cover="";render();removeImages([old]).catch(()=>{})}catch(e){toast(errText(e))}};
   document.querySelectorAll("[data-goto]").forEach(b=>b.onclick=()=>{S.prevView=S.view;S.view=b.dataset.goto;render();window.scrollTo(0,0)});
   const fo=document.getElementById("fbOpen");if(fo)fo.onclick=openFeedback;
   const wl=document.getElementById("wlGo");if(wl)wl.onclick=()=>{S.view=S.isNew?"innst":"hjem";render();window.scrollTo(0,0)};
@@ -916,7 +1026,7 @@ function bind(){
     if(!confirm("Slette kontoen og alle dataene dine for godt? Dette kan ikke angres."))return;
     if(prompt("Skriv SLETT for å bekrefte")!=="SLETT")return;
     da.disabled=true;
-    try{ok(await sb.rpc("delete_my_account"));await sb.auth.signOut();toast("Kontoen er slettet")}
+    try{await removeImages(allImagePaths()).catch(()=>{});ok(await sb.rpc("delete_my_account"));await sb.auth.signOut();toast("Kontoen er slettet")}
     catch(e){da.disabled=false;showErr("delErr",e)}
   };
   const wp=document.getElementById("wxPos");if(wp)wp.onclick=askPos;
