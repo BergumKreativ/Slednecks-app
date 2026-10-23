@@ -93,20 +93,19 @@ const LOAD_LABEL={"Kløvtur":"Vekt i kløven (kg)","Kløvtrening":"Vekt i kløve
 const KROPP=[[3,"Sterk"],[2,"Ok"],[1,"Sliten"]];
 const isMe=s=>s.kategori==="meg";
 // Sesongmodus: viser bare økttyper og innhold som passer årstiden. Valget lagres på enheten.
-// Uten eget valg velges sesongen ut fra måneden (vinter des–mar, sommer jun–aug, ellers høst og vår).
+// Uten eget valg velges sesongen ut fra måneden (vinter des–mar, ellers barmark). Vinter har egne farger.
 const SEASONS={
   vinter:{label:"Vinter",dog:["Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kjettingtrekk","Annet"],me:["Ski","Løping","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
-  host:{label:"Høst og vår",dog:["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
-  sommer:{label:"Sommer",dog:["Gåtur","Kløvtur","Kløvtrening","Canicross","Sykkeljøring","Annet"],me:["Løping","Sykkel","Fjelltur / gåtur","Svømming","Styrke","Mobilitet / yoga","Annet"]},
+  barmark:{label:"Barmark",dog:["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Svømming","Mobilitet / yoga","Annet"]},
 };
-const autoSeason=()=>{const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":m>=6&&m<=8?"sommer":"host"};
-const seasonPick=()=>{try{return localStorage.getItem("sn-season")||""}catch(e){return ""}};
+const autoSeason=()=>{const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":"barmark"};
+const seasonPick=()=>{try{const v=localStorage.getItem("sn-season")||"";return v==="host"||v==="sommer"?"barmark":v}catch(e){return ""}};
 const season=()=>{const v=seasonPick()||autoSeason();return v==="alle"?null:v};
 const seasonTypes=kat=>{const k=season();return k?SEASONS[k][kat==="meg"?"me":"dog"]:(kat==="meg"?MY_TYPES:TYPES)};
 const inSeason=x=>{const k=season();return !k||SEASONS[k][isMe(x)?"me":"dog"].includes(typeOf(x.type,x.kategori))};
 function seasonBar(){
   const cur=seasonPick()||autoSeason();
-  return `<div class="seasons" role="group" aria-label="Sesong">${[["vinter","Vinter"],["host","Høst/vår"],["sommer","Sommer"],["alle","Alt"]].map(([k,l])=>`<button type="button" class="chip" data-season="${k}" aria-pressed="${cur===k}">${l}</button>`).join("")}</div>`;
+  return `<div class="seasons" role="group" aria-label="Sesong">${[["barmark","Barmark"],["vinter","Vinter"],["alle","Alt"]].map(([k,l])=>`<button type="button" class="chip" data-season="${k}" aria-pressed="${cur===k}">${l}</button>`).join("")}</div>`;
 }
 const typeOf=(t,kat)=>kat==="meg"?(MY_TYPES.includes(t)?t:"Annet"):ALIAS[t]||(TYPES.includes(t)?t:"Annet");
 const dogS=()=>S.sessions.filter(s=>!isMe(s)), meS=()=>S.sessions.filter(isMe);
@@ -200,6 +199,7 @@ function render(){
   if(bigMap){bigMap.remove();bigMap=null}
   buildPlan();
   document.body.classList.toggle("anon",!S.user);
+  document.body.classList.toggle("th-vinter",!!S.user&&season()==="vinter");
   if(!sb||S.authReady)hideSplash();
   document.querySelectorAll(".tab").forEach(t=>{if(t.dataset.v===S.view)t.setAttribute("aria-current","page");else t.removeAttribute("aria-current")});
   const app=document.getElementById("app");
@@ -1258,7 +1258,6 @@ function openImport(){
 function seasonStart(){
   const t=todayD(),y=t.getFullYear(),m=t.getMonth()+1,k=season()||autoSeason();
   if(k==="vinter")return new Date(m===12?y:y-1,11,1);
-  if(k==="sommer")return new Date(m>=6?y:y-1,5,1);
   return m>=8?new Date(y,7,1):m>=4?new Date(y,3,1):new Date(y-1,7,1);
 }
 function openFileImport(src){

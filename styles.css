@@ -408,3 +408,6 @@ body.tracking{overflow:hidden}
 .kcard .actions{justify-content:flex-start;gap:8px}
 .srcs .src{width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:8px;gap:12px;cursor:pointer;font:inherit;color:inherit;display:flex;align-items:center}
 .srcs .src:hover{border-color:var(--ink)}
+/* Vintertema: nordlys, fra nattblått til turkis og grønt, i stedet for solnedgangen når sesongen er Vinter */
+body.th-vinter{--grad:linear-gradient(135deg,#0A1A3F 0%,#173E7A 42%,#1B7F95 74%,#23997F 100%);--grad-btn:linear-gradient(90deg,#14336A,#1B7F95);--grad-line:linear-gradient(90deg,#2A63C0,#1FB0A6,#6FDCA0);--accent:#1A6BB5;--accent-soft:#E0EEF7}
+@media (prefers-color-scheme: dark){body.th-vinter{--accent:#5AA9E6;--accent-soft:#12283D}}
