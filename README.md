@@ -33,3 +33,7 @@ Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hu
 ## Grener og regler
 
 [disciplines.js](disciplines.js) har grener, NM/GP-klasser, regler, tips og pulkvektfaktorer fra NHFs konkurranseregler (25.08.2026) og ID- og vaksinasjonsreglement (18.11.2022). Oppdater når NHF endrer reglene.
+
+## Kløvplan
+
+[pack.js](pack.js) er kløvtreningsplanen etter OMTK-modellen (Eilin Bergum, 2025): vekt i prosent av hundens kroppsvekt, ukedistanse og merkene bronse, sølv og gull.

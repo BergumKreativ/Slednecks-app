@@ -158,6 +158,26 @@ body.anon main{padding-bottom:40px}
 .pill{border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:600;white-space:nowrap;background:var(--soft)}
 .pill.ok{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
 
+/* Egen trening */
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--soft);border-radius:999px;padding:4px;margin-top:14px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:10px;font-weight:700;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.chips.rpe{gap:6px}
+.chips.rpe .chip{min-width:40px;padding:8px 0;text-align:center}
+.entry.me .t::before{content:"● ";color:var(--warn)}
+
+.goal{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:12px 14px;margin-top:10px}
+.gbar{margin-top:8px}
+.goal .bar{background:var(--soft);height:8px}
+
+/* Kløvplan */
+.pack{margin-top:10px}
+.pweek{border:1.5px solid var(--line);border-radius:16px;padding:10px 14px;margin-top:8px}
+.pweek p{margin-top:4px}
+.pweek.now{border-color:var(--ink);border-width:2px}
+.pweek.done{background:var(--soft)}
+.pweek.badge{border-color:var(--accent)}
+
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 76px 1fr 1fr;align-items:center}

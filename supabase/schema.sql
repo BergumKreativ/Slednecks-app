@@ -34,6 +34,14 @@ create table if not exists public.okter (
   created_at timestamptz not null default now()
 );
 create index if not exists okter_user_dato on public.okter (user_id, dato);
+-- Egne økter: kategori 'meg' (uten hunder) eller 'hund'. rpe = anstrengelse 1–10, kropp = 3 sterk / 2 ok / 1 sliten
+alter table public.okter add column if not exists kategori text not null default 'hund';
+alter table public.okter add column if not exists rpe   integer;
+alter table public.okter add column if not exists kropp integer;
+-- Vekt på last: kløv eller kjetting for hund, sekk for deg
+alter table public.okter add column if not exists last_kg numeric;
+-- Egne mål: [{ id, name, type, km, hm, kg, date }]
+alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
 
 alter table public.profiles enable row level security;
 alter table public.okter    enable row level security;

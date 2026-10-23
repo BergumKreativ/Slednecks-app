@@ -69,7 +69,7 @@ function buildPlan(){
     const own=custom[iso(addDays(start,wi*7+di))];
     if(own)return[own[0],Number(own[1])||0,Number(own[2])||0,0,1];
     if(x===H)return["Hvile",0,0];
-    if(x===E)return["Egentrening / løs tur",0,0];
+    if(x===E)return["Egentrening – styrke, kjerne og bein",0,0];
     if(x===R)return[`${p.raceName||"Løpet"} ${fmtKm(raceKm)} km${raceHm?` / ${raceHm} hm`:""}`,raceKm,raceHm,1];
     let [name,km,hm,note,snow,key]=x;
     if(!km)return[name,0,0];
@@ -79,9 +79,17 @@ function buildPlan(){
     return[`${snow?"❄ ":""}${name} ${k} km${note?" – "+note:""}`,k,h,key?1:0];
   })}));
 }
-const TYPES=["Sykkeljøring","Canicross","Vogn / ATV","Hundekjøring","Skijøring","Kløv","Tur","Annet"];
-const ALIAS={"Terrengsykkel":"Sykkeljøring","Sykkel":"Sykkeljøring","El-sykkel":"Sykkeljøring","Løping":"Canicross","Gåtur":"Tur","Slede":"Hundekjøring","Vogn":"Vogn / ATV"};
-const typeOf=t=>ALIAS[t]||(TYPES.includes(t)?t:"Annet");
+const TYPES=["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"];
+const ALIAS={"Terrengsykkel":"Sykkeljøring","Sykkel":"Sykkeljøring","El-sykkel":"Sykkeljøring","Løping":"Canicross","Tur":"Gåtur","Kløv":"Kløvtur","Slede":"Hundekjøring","Vogn":"Vogn / ATV"};
+// Egne økter (kategori "meg") har egne typer, og teller ikke mot hundenes ukemål
+const MY_TYPES=["Løping","Styrke","Ski","Sykkel","Fjelltur / gåtur","Mobilitet / yoga","Svømming","Annet"];
+const ACTIVE_WITH_DOG=["Canicross","Skijøring","Sykkeljøring","Gåtur","Kløvtur","Pulk"];
+// Økttyper der vekten på lasten føres
+const LOAD_LABEL={"Kløvtur":"Vekt i kløven (kg)","Kløvtrening":"Vekt i kløven (kg)","Kjettingtrekk":"Kjettingvekt (kg)"};
+const KROPP=[[3,"Sterk"],[2,"Ok"],[1,"Sliten"]];
+const isMe=s=>s.kategori==="meg";
+const typeOf=(t,kat)=>kat==="meg"?(MY_TYPES.includes(t)?t:"Annet"):ALIAS[t]||(TYPES.includes(t)?t:"Annet");
+const dogS=()=>S.sessions.filter(s=>!isMe(s)), meS=()=>S.sessions.filter(isMe);
 const DAYS=["man","tir","ons","tor","fre","lør","søn"];
 const MOODS=[[3,"Stram line"],[2,"Ok"],[1,"Slakk"]];
 
@@ -100,16 +108,16 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
 const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
-const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||""});
+const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
 const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="innst";
@@ -124,7 +132,7 @@ function planStart(){return addDays(monday(parse(S.profile.raceDate)),-70)}
 function planWeekIdx(date){const i=Math.round((monday(date)-planStart())/864e5/7);return i>=0&&i<PLAN_WEEKS?i:-1}
 function planDay(date){const i=planWeekIdx(date);if(i<0)return null;const d=(date.getDay()+6)%7;return{w:i,d,item:PLAN[i].d[d]}}
 const weekTotals=i=>{const d=PLAN[i].d;return{km:d.reduce((a,x)=>a+x[1],0),hm:d.reduce((a,x)=>a+x[2],0),n:d.filter(x=>x[1]>0).length}};
-const byWeek=()=>{const m={};for(const s of S.sessions){const k=iso(monday(parse(s.dato)));(m[k]=m[k]||[]).push(s)}return m};
+const byWeek=(list=dogS())=>{const m={};for(const s of list){const k=iso(monday(parse(s.dato)));(m[k]=m[k]||[]).push(s)}return m};
 
 function render(){
   buildPlan();
@@ -171,7 +179,7 @@ function vHome(){
     goals=`<p style="margin-top:12px"><span class="cond" style="font-size:1.7rem;font-weight:700">${fmtKm(sum(wk,"km"))} km</span> <span class="muted">denne uka · ${Math.round(sum(wk,"hm"))} hm · ${wk.length} økter</span></p>
     ${until>0?`<p class="small muted" style="margin-top:6px">Planen og ukemålene starter ${ps.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})}.</p>`:""}`;
   }
-  let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&S.sessions.some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
+  let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&dogS().some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `
   <section>${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
@@ -187,20 +195,102 @@ function vHome(){
   </section>
   <h2>Hundene</h2>
   ${S.profile.dogs.length?`<div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
+  <div class="row" style="margin-top:28px"><h2 style="margin:0">Deg</h2><button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
+  ${meCard(t)}
   <h2>Uke for uke</h2>
   ${chart(bw)}`;
 }
 
+function meCard(t){
+  const mon=monday(t), wk=meS().filter(s=>parse(s.dato)>=mon), d28=meS().filter(s=>parse(s.dato)>addDays(t,-28));
+  const withDog=dogS().filter(s=>parse(s.dato)>=mon&&ACTIVE_WITH_DOG.includes(typeOf(s.type)));
+  const rpes=wk.map(s=>s.rpe).filter(Boolean), avg=rpes.length?Math.round(rpes.reduce((a,b)=>a+b,0)/rpes.length*10)/10:null;
+  const goals=goalsHtml();
+  if(!meS().length&&!withDog.length)return `<p class="notice">Logg din egen trening her, som løping, styrke og ski. Den holdes adskilt fra hundenes ukemål. Trykk «+ Egen økt» for å starte.</p>${goals}`;
+  return `<div class="stats" style="margin-top:10px"><div><span class="cond">${wk.length}</span><small>økter denne uka</small></div><div><span class="cond">${fmtMin(sum(wk,"min")).replace(" min","m").replace(" t ","t ")}</span><small>tid</small></div>
+   <div><span class="cond">${avg!=null?String(avg).replace(".",","):"–"}</span><small>snitt anstrengelse</small></div><div><span class="cond">${d28.length}</span><small>økter siste 4 uker</small></div></div>
+   ${withDog.length?`<p class="small muted" style="margin-top:8px">I tillegg har du vært aktiv med hundene i ${fmtMin(sum(withDog,"min"))} denne uka (canicross, skijøring, sykkel, gåtur, kløv).</p>`:""}${goals}`;
+}
+/* Egne mål, f.eks. fjelltur med tung sekk. Fremgang regnes fra egne økter av samme type. */
+function goalSessions(g){
+  const own=meS().filter(s=>!g.type||typeOf(s.type,"meg")===g.type);
+  const walk=g.type==="Fjelltur / gåtur"?dogS().filter(s=>["Gåtur","Kløvtur"].includes(typeOf(s.type))):[];
+  return {own,walk};
+}
+function goalProgress(g){
+  const {own,walk}=goalSessions(g), all=[...own,...walk];
+  const best=(list,f)=>list.reduce((a,s)=>Math.max(a,Number(s[f])||0),0);
+  const done=own.some(s=>(!g.km||s.km>=g.km)&&(!g.hm||s.hm>=g.hm)&&(!g.kg||(s.last_kg||0)>=g.kg));
+  return {km:best(all,"km"),hm:best(all,"hm"),kg:best(own,"last_kg"),done};
+}
+/* Forslag til plan mot et eget mål: én langtur i uka som bygges opp mot målet, lettere uke hver 4. uke,
+   nedtrapping uka før, og styrke to ganger i uka. Starter fra det du allerede har gått. */
+function goalPlan(g){
+  if(!g.km&&!g.kg&&!g.hm)return [];
+  const p=goalProgress(g), now=monday(todayD()), end=g.date?monday(parse(g.date)):null;
+  const N=Math.min(16,Math.max(4,end?Math.round((end-now)/864e5/7)+1:10));
+  // Langt unna: planen starter 16 uker før målet
+  const start=end&&end>addDays(now,(N-1)*7)?addDays(end,-(N-1)*7):now;
+  const k0=g.km?Math.max(p.km,g.km*0.4):0, kg0=g.kg?Math.max(p.kg,g.kg*0.4):0;
+  const hmPerKm=g.km&&g.hm?g.hm/g.km:0;
+  const r1=x=>Math.round(x*2)/2;
+  return Array.from({length:N},(_,i)=>{
+    const from=addDays(start,i*7);
+    if(i===N-1)return{from,goal:true,txt:`Målet: ${g.name}`};
+    if(i===N-2&&N>4)return{from,txt:`Nedtrapping: kort tur${g.km?` ${fmtKm(r1(g.km*0.4))} km`:""}${g.kg?` med ${fmtKm(r1(g.kg*0.7))} kg`:""}. Spar kreftene.`};
+    const f=Math.min(1,i/Math.max(1,N-3)), easy=(i+1)%4===0;
+    const km=g.km?r1((k0+(g.km*0.9-k0)*f)*(easy?0.7:1)):0, kg=g.kg?r1((kg0+(g.kg-kg0)*f)*(easy?0.8:1)):0;
+    const hm=hmPerKm?Math.round(km*hmPerKm/50)*50:0;
+    return{from,easy,txt:`${easy?"Lett uke: ":""}Langtur${km?` ${fmtKm(km)} km`:""}${hm?`, ${hm} hm`:""}${kg?` med ${fmtKm(kg)} kg sekk`:""}`};
+  });
+}
+function goalsHtml(){
+  const gs=S.profile.myGoals||[];
+  const bar=(label,v,goal,unit)=>{const pct=Math.min(100,v/goal*100);return `<div class="gbar"><div class="row small"><span>${label}</span><span class="muted">${fmtKm(v)} / ${fmtKm(goal)} ${unit}</span></div><div class="bar"><span style="width:${pct}%"></span></div></div>`};
+  return `<div class="row" style="margin-top:18px"><h3>Mine mål</h3><button class="btn ghost sm" id="addGoal">+ Nytt mål</button></div>
+  ${gs.length?gs.map(g=>{const p=goalProgress(g),days=g.date?Math.round((parse(g.date)-todayD())/864e5):null;
+    return `<button type="button" class="goal" data-goal="${esc(g.id)}"><div class="row"><b>${esc(g.name)}</b><span class="small ${p.done?"badge-ok":"muted"}">${p.done?"Nådd ✓":days!=null?(days>=0?`om ${days} dager`:"datoen er passert"):""}</span></div>
+     <p class="small muted">${esc(g.type||"Alle typer")}${g.date?` · ${parse(g.date).toLocaleDateString("nb-NO",{day:"numeric",month:"long",year:"numeric"})}`:""}</p>
+     ${g.km?bar("Lengste tur",p.km,g.km,"km"):""}${g.hm?bar("Mest stigning",p.hm,g.hm,"hm"):""}${g.kg?bar("Tyngste sekk",p.kg,g.kg,"kg"):""}
+     ${!g.km&&!g.hm&&!g.kg?`<p class="small muted">Sett distanse, høydemeter eller sekkvekt for å følge fremgangen.</p>`:p.done?"":(()=>{const gp=goalPlan(g),w=gp.find(x=>x.from<=todayD()&&addDays(x.from,7)>todayD());return w?`<p class="small" style="margin-top:8px"><b>Denne uka:</b> ${esc(w.txt)}</p>`:gp.length?`<p class="small muted" style="margin-top:8px">Planen starter ${gp[0].from.toLocaleDateString("nb-NO",{day:"numeric",month:"long"})}. Til da: tren som vanlig.</p>`:""})()}</button>`}).join("")
+  :`<p class="small muted" style="margin-top:6px">For eksempel: «Galdhøpiggen med 12 kg sekk» – 15 km, 1300 hm og 12 kg. Fremgangen regnes fra øktene du logger.</p>`}`;
+}
+function openGoal(g){
+  const e=g||{type:"Fjelltur / gåtur"};
+  panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">${g?"Endre mål":"Nytt mål"}</h2><button class="btn ghost" id="gClose">Lukk</button></div>
+  <div class="field"><label for="g-name">Mål</label><input id="g-name" value="${esc(e.name||"")}" maxlength="60" placeholder="F.eks. Galdhøpiggen med 12 kg sekk"></div>
+  <div class="field"><label for="g-type">Type økt som teller</label><select id="g-type">${MY_TYPES.map(t=>`<option ${e.type===t?"selected":""}>${t}</option>`).join("")}</select></div>
+  <div class="field grid3"><div><label for="g-km">Km</label><input id="g-km" inputmode="decimal" value="${e.km||""}" placeholder="–"></div>
+   <div><label for="g-hm">Høydemeter</label><input id="g-hm" inputmode="numeric" value="${e.hm||""}" placeholder="–"></div>
+   <div><label for="g-kg">Sekk (kg)</label><input id="g-kg" inputmode="decimal" value="${e.kg||""}" placeholder="–"></div></div>
+  <div class="field"><label for="g-date">Når (valgfritt)</label><input id="g-date" type="date" value="${esc(e.date||"")}"></div>
+  <p class="small muted" style="margin-top:8px">Målet er nådd når én økt av denne typen har minst denne distansen, stigningen og sekkvekten.</p>
+  ${g&&goalPlan(g).length?`<h3 style="margin-top:18px">Forslag til plan</h3>
+   <p class="small muted">Én langtur i uka som bygges opp fra det du har gått til nå, lett uke hver 4. uke og nedtrapping før målet. I tillegg: styrke for bein, kjerne og rygg to ganger i uka, gjerne en kortere tur med hunden.</p>
+   <div class="list">${goalPlan(g).map((w,i)=>`<div class="lrow${w.goal?" goalrow":""}"><span class="small muted" style="flex:0 0 64px">Uke ${i+1}<br>${fmtD(w.from)}</span><span${w.easy?' class="muted"':""}>${w.goal?"<b>":""}${esc(w.txt)}${w.goal?"</b>":""}</span></div>`).join("")}</div>`:""}
+  <p class="err" id="gErr" hidden></p>
+  <div class="actions">${g?`<button class="btn del" id="gDel">Slett</button>`:""}<button class="btn" id="gSave">Lagre mål</button></div>`;
+  sheet.classList.add("open");
+  const put=async list=>{try{ok(await sb.from("profiles").update({my_goals:list}).eq("user_id",S.user.id));S.profile.myGoals=list;closeForm();render();toast("Målet er lagret")}catch(err){showErr("gErr",err)}};
+  const $=id=>panel.querySelector("#"+id);
+  $("gClose").onclick=closeForm;
+  $("gSave").onclick=()=>{
+    const name=$("g-name").value.trim();if(!name)return showErr("gErr",{message:"Gi målet et navn."});
+    const v={id:e.id||newId(),name,type:$("g-type").value,km:num($("g-km").value)||null,hm:Math.round(num($("g-hm").value))||null,kg:num($("g-kg").value)||null,date:$("g-date").value||""};
+    const list=(S.profile.myGoals||[]).filter(x=>x.id!==v.id);put(g?(S.profile.myGoals||[]).map(x=>x.id===v.id?v:x):[...list,v]);
+  };
+  const d=$("gDel");if(d)d.onclick=()=>{if(confirm("Slette målet?"))put((S.profile.myGoals||[]).filter(x=>x.id!==e.id))};
+}
 function progressCard(t){
   const ps=planStart(), race=parse(S.profile.raceDate), end=addDays(monday(race),6);
   const total=PLAN.reduce((a,_,i)=>a+weekTotals(i).km,0);
-  const inPlan=S.sessions.filter(s=>{const d=parse(s.dato);return d>=ps&&d<=end});
+  const inPlan=dogS().filter(s=>{const d=parse(s.dato);return d>=ps&&d<=end});
   const done=sum(inPlan,"km"), fk=Math.min(1,done/total);
   const span=Math.round((race-ps)/864e5), gone=Math.min(span,Math.max(0,Math.round((t-ps)/864e5))), ft=span?gone/span:0;
   const wkNo=Math.min(PLAN.length,Math.max(0,Math.floor((t-ps)/864e5/7)+1));
   const R1=56,R2=40,C1=2*Math.PI*R1,C2=2*Math.PI*R2;
   const started=t>=ps;
-  const before=sum(S.sessions.filter(s=>parse(s.dato)<ps),"km");
+  const before=sum(dogS().filter(s=>parse(s.dato)<ps),"km");
   const ahead=started&&gone>0?(fk-ft):0;
   const status=!started?`Planen starter ${ps.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})}.`
     :ahead>=0.03?"Du ligger foran planen.":ahead<=-0.08?"Du ligger litt bak planen.":"Du ligger i rute.";
@@ -275,6 +365,36 @@ function weightChart(ws){
     <text x="${pad}" y="${Hh-4}">${fmtD(t0)}</text><text x="${W-pad}" y="${Hh-4}" text-anchor="end">${fmtD(t1)}</text>
     <text x="${W-pad}" y="12" text-anchor="end">${fmtKm(pts[pts.length-1].kg)} kg</text></svg></div>`;
 }
+/* Kløvplan (pack.js). Startdato lagres i dogInfo.packStart. Fremgang regnes fra hundens kløvøkter. */
+const PACK_TYPES=["Kløvtur","Kløvtrening"];
+function packWeek(n,start,i){
+  const from=addDays(parse(start),i*7), to=addDays(from,7);
+  const ss=dogS().filter(s=>(s.hunder||[]).includes(n)&&PACK_TYPES.includes(typeOf(s.type))&&parse(s.dato)>=from&&parse(s.dato)<to);
+  return {from,km:sum(ss,"km"),maxKg:ss.reduce((a,s)=>Math.max(a,Number(s.last_kg)||0),0),longest:ss.reduce((a,s)=>Math.max(a,Number(s.km)||0),0)};
+}
+function packSection(n){
+  const i=dogInfo(n), lw=lastWeight(n), kg=pct=>lw?Math.round(lw.kg*pct/100*10)/10:null;
+  const ageNote=i.born&&ageMonths(i.born)<18?`<p class="notice warnbox">${esc(n)} er ${ageText(ageMonths(i.born))}. Vent med vekt i kløven til hunden er minst 18 måneder.</p>`:"";
+  const rule=`<p class="small muted" style="margin-top:8px"><b>Huskeregel:</b> ${esc(window.PACK_RULE)}</p>`;
+  if(!i.packStart)return `<h2>Kløvtrening</h2>${ageNote}
+    <ul class="small" style="padding-left:20px;margin:6px 0">${window.PACK_INTRO.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>${rule}
+    <p class="small muted" style="margin-top:8px">${esc(window.PACK_PREP)}</p>
+    ${lw?"":`<p class="small muted" style="margin-top:8px">Legg inn vekten til ${esc(n)} over, så regnes kiloene ut for deg.</p>`}
+    <div class="field"><label for="pk-start">Start uke 1</label><input id="pk-start" type="date" value="${iso(addDays(monday(todayD()),7))}"></div>
+    <div class="actions"><button class="btn" id="pkStart">Start kløvplan (${PACK_PLAN.length} uker)</button></div>`;
+  const cur=Math.floor((todayD()-parse(i.packStart))/864e5/7);
+  return `<div class="row" style="margin-top:28px"><h2 style="margin:0">Kløvplan</h2><button class="btn ghost sm" id="pkStop">Avslutt</button></div>
+  <p class="small muted">Startet ${parse(i.packStart).toLocaleDateString("nb-NO",{day:"numeric",month:"long"})}${lw?` · regnet ut fra ${fmtKm(lw.kg)} kg`:" · legg inn vekt for å se kilo"}. Logg turene som «Kløvtur» eller «Kløvtrening» med vekt i kløven.</p>
+  ${ageNote}${rule}
+  <div class="pack">${PACK_PLAN.map((w,k)=>{const pw=packWeek(n,i.packStart,k),tk=kg(w.pct);
+    const okKg=!w.pct||!tk||pw.maxKg>=tk*0.95, done=!w.rest&&pw.km>=w.km&&okKg, now=k===cur;
+    return `<div class="pweek${now?" now":""}${done?" done":""}${w.badge?" badge":""}"><div class="row"><b>Uke ${k+1}</b><span class="small muted">${fmtD(pw.from)}</span></div>
+     <p>${w.rest?esc(w.ex):`<b>${w.pct} %${tk?` · ${fmtKm(tk)} kg`:""}</b> · ${w.km} km i uka <span class="muted">(${esc(w.ex)})</span>`}</p>
+     ${w.badge?`<p class="small"><b>${w.badge}merket:</b> ${esc(w.badgeText)}</p>`:""}
+     ${w.note?`<p class="small muted">${esc(w.note)}</p>`:""}
+     ${!w.rest&&(pw.km||k<=cur)?`<p class="small ${done?"badge-ok":"muted"}">${done?"✓ ":""}Gått ${fmtKm(pw.km)} av ${w.km} km${pw.maxKg?` · tyngst ${fmtKm(pw.maxKg)} kg`:""}${!okKg&&pw.km?" · for lite vekt":""}</p>`:""}</div>`}).join("")}
+   <div class="pweek badge"><b>Neste sesong: ${window.PACK_GOLD.badge}merket</b><p class="small">${esc(window.PACK_GOLD.text)}${kg(25)?` (${fmtKm(kg(25))} kg)`:""}</p><p class="small muted">${esc(window.PACK_GOLD.note)}</p></div></div>`;
+}
 function vDog(){
   const n=S.dog, i=dogInfo(n), ws=byDateDesc(i.weights), vs=byDateDesc(i.vaccines), warn=dogWarnings(n);
   const mine=S.sessions.filter(s=>(s.hunder||[]).includes(n)), lw=ws.find(w=>w.kg), lb=ws.find(w=>w.bcs);
@@ -294,6 +414,8 @@ function vDog(){
   <div class="actions"><button class="btn" id="wAdd">Legg til måling</button></div>
   <p class="small muted" style="margin-top:8px">BCS (body condition score) går fra 1 til 9, der 4–5 er ideelt. Du skal lett kunne kjenne ribbeina, og se en tydelig midje ovenfra.</p>
   ${ws.length?`<div class="list">${ws.map(w=>`<div class="lrow"><span>${fmtD(parse(w.d))} ${parse(w.d).getFullYear()}</span><span>${w.kg?`<b>${fmtKm(w.kg)} kg</b>`:""}${w.bcs?` · BCS ${w.bcs}`:""}</span><button type="button" class="btn ghost sm" data-wdel="${esc(w.id)}" aria-label="Slett måling">Slett</button></div>`).join("")}</div>`:""}
+
+  ${packSection(n)}
 
   <h2>Vaksinekort</h2>
   ${vs.length?`<div class="list">${vs.map(v=>{const st=vaccineStatus(v);return `<div class="lrow"><span><b>${esc(vacName(v.type))}</b><br><span class="small muted">Gitt ${parse(v.d).toLocaleDateString("nb-NO")}${v.note?` · ${esc(v.note)}`:""}</span></span><span class="pill ${st.c}">${esc(st.t)}</span><button type="button" class="btn ghost sm" data-vdel="${esc(v.id)}" aria-label="Slett vaksine">Slett</button></div>`}).join("")}</div>`:`<p class="muted">Ingen vaksiner registrert.</p>`}
@@ -355,23 +477,25 @@ function chart(bw){
 }
 
 function vLog(){
-  const bw=byWeek(), keys=Object.keys(bw).sort().reverse();
-  if(!keys.length)return `<h2 style="margin-top:6px">Logg</h2><p class="empty">${S.loaded?"Ingen økter ennå. Trykk + for å føre den første, eller importer gamle økter under Hunder.":"Henter økter …"}</p>`;
-  return `<h2 style="margin-top:6px">Logg</h2><p class="muted">${S.sessions.length} økter · ${fmtKm(sum(S.sessions,"km"))} km · ${Math.round(sum(S.sessions,"hm")).toLocaleString("nb-NO")} høydemeter totalt</p>`+
-  keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),km=sum(list,"km"),goal=i>=0?weekTotals(i).km:0;
-    return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`} · ${Math.round(sum(list,"hm"))} hm</span></div>
-    ${list.map(s=>{const d=parse(s.dato);return `<button class="entry" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
-      <span><span class="t">${esc(typeOf(s.type))}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
-      <span class="k">${fmtKm(s.km)}</span></button>`}).join("")}</section>`}).join("");
+  const f=S.logFilter||"alle", all=f==="hund"?dogS():f==="meg"?meS():S.sessions;
+  const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
+  const tabs=`<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
+  if(!keys.length)return `<h2 style="margin-top:6px">Logg</h2>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
+  return `<h2 style="margin-top:6px">Logg</h2>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
+  keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
+    return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
+    ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
+      <span><span class="t">${esc(typeOf(s.type,s.kategori))}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
+      <span class="k">${s.km?fmtKm(s.km):""}</span></button>`}).join("")}</section>`}).join("");
 }
 
 function vPlan(){
-  const t=todayD(),start=planStart(),done=new Set(S.sessions.map(s=>s.dato)),bw=byWeek();
+  const t=todayD(),start=planStart(),doneDog=new Set(dogS().map(s=>s.dato)),doneAny=new Set(S.sessions.map(s=>s.dato)),bw=byWeek();
   return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">${esc(TEMPLATES[planTypeFor(S.profile)].label)}-plan laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}.${grenFor(S.profile).snow?" ❄ = kjør på snø hvis mulig.":""} Trykk på en dag for å endre den.</p>`+
   PLAN.map((wk,i)=>{const m=addDays(start,i*7),g=weekTotals(i),got=sum(bw[iso(m)]||[],"km");
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${got?`<span class="${got>=g.km?"hit":""}">${fmtKm(got)}</span> / `:""}${g.km} km</span></div><p class="phase">${esc(wk.f)} · ${fmtD(m)}–${fmtD(addDays(m,6))} · ${g.hm} hm</p>
     ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=it[3];
-      return `<button type="button" data-pdate="${iso(dt)}" class="${["pday",!it[1]?"rest":"",done.has(iso(dt))?"done":"",key?"key":"",it[4]?"own":"",iso(dt)===iso(t)?"istoday":""].join(" ")}"><span class="cond" style="font-weight:600">${DAYS[d]} <span class="muted" style="font-weight:500">${dt.getDate()}.${dt.getMonth()+1}</span></span><span class="pt">${esc(it[0])}</span><span class="muted">${it[1]?it[1]+" km":""}</span></button>`}).join("")}</section>`}).join("")+
+      return `<button type="button" data-pdate="${iso(dt)}" class="${["pday",!it[1]?"rest":"",(it[1]?doneDog:doneAny).has(iso(dt))&&it[0]!=="Hvile"?"done":"",key?"key":"",it[4]?"own":"",iso(dt)===iso(t)?"istoday":""].join(" ")}"><span class="cond" style="font-weight:600">${DAYS[d]} <span class="muted" style="font-weight:500">${dt.getDate()}.${dt.getMonth()+1}</span></span><span class="pt">${esc(it[0])}</span><span class="muted">${it[1]?it[1]+" km":""}</span></button>`}).join("")}</section>`}).join("")+
   (Object.keys(S.profile.planCustom||{}).length?`<div class="actions"><button class="btn ghost" id="resetPlan">Tilbakestill alle egne endringer</button></div>`:"");
 }
 
@@ -463,32 +587,39 @@ function vSettings(){
 /* Skjema */
 let editing=null,F=null;
 const panel=document.getElementById("panel"),sheet=document.getElementById("sheet");
-function openForm(s){
+function openForm(s,kat){
   editing=s||null;
-  const last=S.sessions.slice().sort((a,b)=>a.dato<b.dato?1:-1)[0];
-  F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkeljøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:""};
-  F.type=typeOf(F.type);F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
+  const last=dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0];
+  F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkeljøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:"",kategori:kat||"hund",rpe:null,kropp:null};
+  if(!s&&kat==="meg")F.type=(meS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Løping";
+  F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
   if(!F.min)F.min="";if(!F.hm)F.hm="";
   draw();sheet.classList.add("open");
 }
 function closeForm(){sheet.classList.remove("open");editing=null}
 function draw(){
-  const dogs=Array.from(new Set([...S.profile.dogs,...F.hunder])), pd=planDay(parse(F.dato||iso(new Date())));
+  const me=F.kategori==="meg", dogs=Array.from(new Set([...S.profile.dogs,...F.hunder])), pd=planDay(parse(F.dato||iso(new Date())));
   panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">${editing?"Endre økt":"Ny økt"}</h2><button class="btn ghost" id="fClose">Lukk</button></div>
   ${pd&&pd.item[1]?`<p class="muted small" style="margin-top:6px">Plan denne dagen: ${esc(pd.item[0])}</p>`:""}
+  ${editing?"":`<div class="seg" role="group" aria-label="Hvem trente"><button type="button" data-kat="hund" aria-pressed="${!me}">Med hunder</button><button type="button" data-kat="meg" aria-pressed="${me}">Bare meg</button></div>`}
   <div class="field"><label for="f-dato">Dato</label><input id="f-dato" type="date" value="${esc(F.dato)}"></div>
-  <div class="field"><span class="flabel">Type økt</span><div class="chips">${TYPES.map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")}</div></div>
+  <div class="field"><span class="flabel">Type økt</span><div class="chips">${(me?MY_TYPES:TYPES).map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")}</div></div>
   <div class="field grid3"><div><label for="f-km">Km</label><input id="f-km" inputmode="decimal" value="${esc(F.km)}" placeholder="0"></div>
    <div><label for="f-hm">Høydemeter</label><input id="f-hm" inputmode="numeric" value="${esc(F.hm)}" placeholder="0"></div>
    <div><label for="f-min">Minutter</label><input id="f-min" inputmode="numeric" value="${esc(F.min)}" placeholder="0"></div></div>
-  <div class="field"><span class="flabel">Hunder med</span><div class="chips">${dogs.map(d=>`<button type="button" class="chip" data-dog="${esc(d)}" aria-pressed="${F.hunder.includes(d)}">${esc(d)}</button>`).join("")}</div></div>
-  ${F.hunder.length?`<div class="field"><span class="flabel">Hvordan jobbet de?</span>${F.hunder.map(d=>`<div class="moodrow"><span>${esc(d)}</span><span class="opts">${MOODS.map(([v,l])=>`<button type="button" data-mdog="${esc(d)}" data-m="${v}" aria-pressed="${F.motivasjon[d]===v}">${l}</button>`).join("")}</span></div>`).join("")}</div>`:""}
-  <div class="field"><label for="f-kom">Kommentar</label><textarea id="f-kom" placeholder="Føre, vær, poter, hvordan det gikk …">${esc(F.kommentar)}</textarea></div>
+  ${me||LOAD_LABEL[F.type]?`<div class="field"><label for="f-kg">${me?"Sekk (kg)":LOAD_LABEL[F.type]}</label><input id="f-kg" inputmode="decimal" value="${esc(F.last_kg??"")}" placeholder="${me?"Ingen sekk":"0"}"></div>`:""}
+  ${me?`<div class="field"><span class="flabel">Hvor hardt var det? <span class="muted" style="font-weight:400">(1 = veldig lett, 10 = maks)</span></span><div class="chips rpe">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<button type="button" class="chip" data-rpe="${v}" aria-pressed="${F.rpe===v}">${v}</button>`).join("")}</div></div>
+  <div class="field"><span class="flabel">Hvordan kjentes kroppen?</span><div class="chips">${KROPP.map(([v,l])=>`<button type="button" class="chip" data-kropp="${v}" aria-pressed="${F.kropp===v}">${l}</button>`).join("")}</div></div>`:`<div class="field"><span class="flabel">Hunder med</span><div class="chips">${dogs.map(d=>`<button type="button" class="chip" data-dog="${esc(d)}" aria-pressed="${F.hunder.includes(d)}">${esc(d)}</button>`).join("")}</div></div>`}
+  ${!me&&F.hunder.length?`<div class="field"><span class="flabel">Hvordan jobbet de?</span>${F.hunder.map(d=>`<div class="moodrow"><span>${esc(d)}</span><span class="opts">${MOODS.map(([v,l])=>`<button type="button" data-mdog="${esc(d)}" data-m="${v}" aria-pressed="${F.motivasjon[d]===v}">${l}</button>`).join("")}</span></div>`).join("")}</div>`:""}
+  <div class="field"><label for="f-kom">Kommentar</label><textarea id="f-kom" placeholder="${me?"Hva du gjorde, hvordan det gikk …":"Føre, vær, poter, hvordan det gikk …"}">${esc(F.kommentar)}</textarea></div>
   <p class="err" id="fErr" hidden></p>
   <div class="actions">${editing?`<button class="btn del" id="fDel">Slett</button>`:""}<button class="btn" id="fSave">${editing?"Lagre endringer":"Lagre økt"}</button></div>`;
-  const keep=()=>{F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
+  const keep=()=>{const kgEl=panel.querySelector("#f-kg");if(kgEl)F.last_kg=kgEl.value;F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
   panel.querySelector("#fClose").onclick=closeForm;
   panel.querySelector("#f-dato").onchange=()=>{keep();draw()};
+  panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");draw()});
+  panel.querySelectorAll("[data-rpe]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.rpe);F.rpe=F.rpe===v?null:v;draw()});
+  panel.querySelectorAll("[data-kropp]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.kropp);F.kropp=F.kropp===v?null:v;draw()});
   panel.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{keep();F.type=b.dataset.type;draw()});
   panel.querySelectorAll("[data-dog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.dog;if(F.hunder.includes(d)){F.hunder=F.hunder.filter(x=>x!==d);delete F.motivasjon[d]}else F.hunder=[...F.hunder,d];draw()});
   panel.querySelectorAll("[data-mdog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.mdog,v=Number(b.dataset.m);if(F.motivasjon[d]===v)delete F.motivasjon[d];else F.motivasjon[d]=v;draw()});
@@ -519,10 +650,10 @@ function openDay(date){
   const r=panel.querySelector("#dReset");if(r)r.onclick=()=>put(null);
 }
 const num=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:0};
-const toRow=s=>({dato:s.dato,type:typeOf(s.type),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:s.hunder||[],motivasjon:s.motivasjon||{},kommentar:String(s.kommentar||"").trim()});
+const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null}};
 async function save(){
   if(!F.dato)return showErr("fErr",{message:"Velg en dato."});
-  if(!num(F.km)&&!F.kommentar.trim())return showErr("fErr",{message:"Skriv inn km eller en kommentar."});
+  if(!num(F.km)&&!num(F.min)&&!F.kommentar.trim())return showErr("fErr",{message:"Skriv inn km, minutter eller en kommentar."});
   const body=toRow(F);
   const btn=document.getElementById("fSave");btn.disabled=true;
   try{
@@ -555,6 +686,8 @@ function bindDog(){
     const i=dogInfo(n);save({...i,vaccines:[...(i.vaccines||[]),{id:newId(),type:$("v-type").value,d:$("v-d").value,until:$("v-until").value||"",note:$("v-note").value.trim()}]},"Vaksinen er lagret");
   };
   document.querySelectorAll("[data-vdel]").forEach(b=>b.onclick=()=>{if(!confirm("Slette denne vaksinen?"))return;const i=dogInfo(n);save({...i,vaccines:(i.vaccines||[]).filter(v=>v.id!==b.dataset.vdel)},"Vaksinen er slettet")});
+  const ps=$("pkStart");if(ps)ps.onclick=()=>{const d=$("pk-start").value;if(!d)return showErr("dogErr",{message:"Velg når uke 1 starter."});save({...dogInfo(n),packStart:iso(monday(parse(d)))},"Kløvplanen er startet")};
+  const pst=$("pkStop");if(pst)pst.onclick=()=>{if(!confirm("Avslutte kløvplanen? Øktene dine blir liggende."))return;const i={...dogInfo(n)};delete i.packStart;save(i,"Kløvplanen er avsluttet")};
   $("iSave").onclick=()=>{
     const chip=$("i-chip").value.replace(/\s/g,"");
     if(chip&&!/^\d{9,15}$/.test(chip))return showErr("dogErr",{message:"Chip-ID skal være 9–15 siffer (vanligvis 15)."});
@@ -574,7 +707,7 @@ async function importData(file){
   const data=JSON.parse(await file.text());
   const list=Array.isArray(data)?data:data.okter;
   if(!Array.isArray(list))throw new Error("Fila ser ikke ut som en Slednecks-backup.");
-  const key=s=>`${s.dato}|${typeOf(s.type)}|${num(s.km)}`;
+  const key=s=>`${s.dato}|${s.kategori==="meg"?"meg":"hund"}|${typeOf(s.type,s.kategori)}|${num(s.km)}|${num(s.min)}`;
   const have=new Set(S.sessions.map(key));
   const rows=list.filter(s=>s&&/^\d{4}-\d{2}-\d{2}$/.test(s.dato)&&!have.has(key(s))).map(toRow);
   if(rows.length)ok(await sb.from("okter").insert(rows));
@@ -583,6 +716,10 @@ async function importData(file){
 }
 
 function bind(){
+  const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
+  document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
+  const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
+  document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});
   document.querySelectorAll("[data-dogpage]").forEach(b=>b.onclick=()=>{S.dog=b.dataset.dogpage;S.view="hund";render();window.scrollTo(0,0)});
   if(S.view==="hund"&&S.user)bindDog();
   const send=document.getElementById("l-send");
