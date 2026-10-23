@@ -8,7 +8,7 @@ Nettapp for å føre og følge opp treningsøkter med hundene frem mot løpet. R
 
 1. **Database:** Supabase → SQL Editor → lim inn [supabase/schema.sql](supabase/schema.sql) → Run.
 2. **Nøkler:** Supabase → Project Settings → API. Kopier *Project URL* og *anon public*-nøkkelen inn i [config.js](config.js).
-3. **Innlogging:** Supabase → Authentication → URL Configuration. Sett *Site URL* til adressen appen ligger på (https://slednecks.eilinbergum.com/) og legg den til under *Redirect URLs*. Legg også til `http://127.0.0.1:5173/` for lokal testing.
+3. **Innlogging:** Supabase → Authentication → URL Configuration. Sett *Site URL* til adressen appen ligger på (nå https://bergumkreativ.github.io/Slednecks-app/; legg tilbake `CNAME` når DNS for eget domene er klar) og legg den til under *Redirect URLs*. Legg også til `http://127.0.0.1:5173/` for lokal testing.
 
 ## Kjøre lokalt
 

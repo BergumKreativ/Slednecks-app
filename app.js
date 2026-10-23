@@ -179,8 +179,12 @@ function vLogin(){
   ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
-    <div class="actions"><button class="btn" id="l-send">Send innloggingslenke</button></div>
-    <p class="small muted" style="margin-top:10px">Ingen passord. Du får en lenke på e-post, og holder deg innlogget på denne enheten.</p>`}
+    ${S.pwMode?`<div class="field"><label for="l-pw">Passord</label><input id="l-pw" type="password" autocomplete="current-password"></div>
+    <div class="actions"><button class="btn" id="l-pwgo">Logg inn</button></div>
+    <p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="l-mode">Få innloggingslenke på e-post i stedet</button></p>`
+    :`<div class="actions"><button class="btn" id="l-send">Send innloggingslenke</button></div>
+    <p class="small muted" style="margin-top:10px">Ingen passord. Du får en lenke på e-post, og holder deg innlogget på denne enheten.</p>
+    <p class="small" style="margin-top:8px"><button type="button" class="linkbtn" id="l-mode">Logg inn med passord</button></p>`}`}
   <p class="err" id="lErr" hidden></p>
   <p class="small muted" style="margin-top:28px"><button type="button" class="linkbtn" data-goto="personvern">Personvern</button> · versjon ${esc(APP_VERSION)}</p></section>`;
 }
@@ -861,8 +865,8 @@ function vLog(){
   const f=S.logFilter||"alle", all=f==="hund"?dogS():f==="meg"?meS():S.sessions;
   const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
   const tabs=`<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
-  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
-  return `${sh("list","Logg","plan","margin-top:6px")}${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
+  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
+  return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
@@ -972,6 +976,8 @@ function vSettings(){
   <p class="muted">Innlogget som ${esc(S.user?.email||"")}</p>
   <div class="field"><label for="nick">Visningsnavn på føremeldinger</label><div class="row" style="align-items:center"><input id="nick" maxlength="30" value="${esc(p.nickname||"")}" placeholder="Valgfritt, ellers «Anonym»"><button type="button" class="btn ghost" id="nickSave">Lagre</button></div></div>
   <div class="actions"><button class="btn ghost" id="logoutBtn">Logg ut</button></div>
+  <div class="field"><label for="newpw">Nytt passord (valgfritt)</label><div class="row" style="align-items:center"><input id="newpw" type="password" autocomplete="new-password" placeholder="Minst 8 tegn"><button type="button" class="btn ghost" id="pwSave">Lagre</button></div></div>
+  <p class="small muted" style="margin-top:4px">Med passord kan du logge inn uten å vente på e-post.</p>
   <details class="rules" style="margin-top:18px"><summary>Slett kontoen min</summary>
    <p class="small">Dette sletter profilen, hundene, planen og alle øktene dine for godt. Last ned en backup først hvis du vil ta vare på noe.</p>
    <div class="actions"><button class="btn del" id="delAcc">Slett kontoen og alle data</button></div><p class="err" id="delErr" hidden></p></details>`;
@@ -1005,6 +1011,52 @@ async function loadGpx(file){
   if(!F.kommentar&&g.name)F.kommentar=g.name;
   if(g.start&&iso(g.start)!==iso(new Date())){F.temp="";F.rh=""}
   return g;
+}
+/* Tractive-import: posisjonshistorikk (GPX/KML fra my.tractive.com) deles i turer, og brukeren velger hvilke som blir økter */
+const guessType=kmh=>kmh>=13?"Sykkeljøring":kmh>=7?"Canicross":"Gåtur";
+function openTractive(){
+  const T={trips:null,err:"",dog:S.profile.dogs[0]||"",pick:{},types:{},gap:20,sel:null};
+  const exists=t=>S.sessions.some(x=>x.dato===iso(t.start)&&Math.abs((Number(x.km)||0)-t.km)<=Math.max(0.3,t.km*0.08));
+  const hm=d=>d.toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
+  let file=null;
+  const parseFile=async()=>{try{T.trips=GPX.splitTrips(GPX.readPoints(await file.text()),{gapMin:T.gap});T.err="";T.pick={};T.types={};T.trips.forEach((t,i)=>{T.pick[i]=!exists(t)&&t.km>=1;T.types[i]=guessType(t.kmh)})}catch(e){T.trips=null;T.err=e.message}draw()};
+  const draw=()=>{
+    const n=T.trips?Object.values(T.pick).filter(Boolean).length:0;
+    panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Importer fra Tractive</h2><button class="btn ghost" id="trClose">Lukk</button></div>
+    <ol class="small" style="padding-left:20px;margin:8px 0">
+     <li>Logg inn på <b>my.tractive.com</b> (krever Premium), åpne historikken til hunden og last ned som GPX eller KML. Maks 60 dager om gangen.</li>
+     <li>Velg fila her. Appen deler den opp i turer der hunden har stått stille i mer enn ${T.gap} minutter.</li></ol>
+    <div class="actions" style="margin-top:6px"><button type="button" class="btn line" id="trPick">${T.trips?"Velg en annen fil":"Velg fil fra Tractive"}</button></div><input type="file" id="trFile" accept=".gpx,.kml,application/gpx+xml,application/vnd.google-earth.kml+xml,application/xml,text/xml" hidden>
+    ${T.err?`<p class="err">${esc(T.err)}</p>`:""}
+    ${T.trips?`
+     <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="trDog">Hund</label><select id="trDog">${S.profile.dogs.map(d=>`<option ${d===T.dog?"selected":""}>${esc(d)}</option>`).join("")}</select></div>
+      <div><label for="trGap">Ny tur etter pause på</label><select id="trGap">${[10,20,30,60].map(g=>`<option value="${g}" ${g===T.gap?"selected":""}>${g} min</option>`).join("")}</select></div></div>
+     <div id="trMap" class="map" style="height:200px"></div>
+     <p class="small muted" style="margin-top:6px">${T.trips.length} turer funnet. Trykk på en tur for å se den på kartet. Turer som ser ut til å finnes i loggen fra før, er ikke krysset av.</p>
+     <div class="list">${T.trips.length?T.trips.map((t,i)=>`<div class="lrow trrow${T.sel===i?" sel":""}" data-tr="${i}"><input type="checkbox" data-trc="${i}" ${T.pick[i]?"checked":""} aria-label="Importer turen" style="width:auto">
+       <span><b>${DAYS[(t.start.getDay()+6)%7]} ${fmtD(t.start)}</b> ${hm(t.start)}–${hm(t.end)}<br><span class="small muted">${fmtKm(t.km)} km · ${fmtMin(t.min)}${t.hm?` · ${t.hm} hm`:""} · ${fmtKm(t.kmh)} km/t${exists(t)?" · finnes kanskje":""}</span></span>
+       <select data-trt="${i}" aria-label="Type økt" style="width:auto;padding:6px 8px">${TYPES.map(x=>`<option ${T.types[i]===x?"selected":""}>${x}</option>`).join("")}</select></div>`).join(""):`<p class="small muted">Fant ingen turer over 0,5 km. Prøv kortere pause.</p>`}</div>
+     <p class="err" id="trErr" hidden></p>
+     <div class="actions"><button class="btn" id="trSave" ${n?"":"disabled"}>Importer ${n} ${n===1?"tur":"turer"}</button></div>`:""}`;
+    const $=id=>panel.querySelector("#"+id), f=$("trFile");
+    $("trClose").onclick=closeForm;$("trPick").onclick=()=>f.click();
+    f.onchange=()=>{file=f.files[0];if(file)parseFile()};
+    if(!T.trips)return;
+    $("trDog").onchange=e=>T.dog=e.target.value;
+    $("trGap").onchange=e=>{T.gap=Number(e.target.value);parseFile()};
+    panel.querySelectorAll("[data-trc]").forEach(c=>c.onchange=()=>{T.pick[c.dataset.trc]=c.checked;draw()});
+    panel.querySelectorAll("[data-trt]").forEach(c=>c.onchange=()=>{T.types[c.dataset.trt]=c.value});
+    panel.querySelectorAll("[data-tr]").forEach(r=>r.onclick=e=>{if(e.target.closest("input,select"))return;T.sel=Number(r.dataset.tr);draw()});
+    if(fMap){fMap.remove();fMap=null}
+    const t=T.trips[T.sel??0];if(t)fMap=drawRoute($("trMap"),t.route);
+    $("trSave").onclick=async()=>{
+      const rows=T.trips.map((t,i)=>T.pick[i]?{dato:iso(t.start),type:T.types[i],km:Math.round(t.km*100)/100,hm:t.hm,min:t.min,hunder:T.dog?[T.dog]:[],motivasjon:{},kommentar:"Fra Tractive",kategori:"hund",rute:t.route,kilde:"tractive",bilder:[]}:null).filter(Boolean);
+      $("trSave").disabled=true;
+      try{ok(await sb.from("okter").insert(rows));closeForm();toast(`${rows.length} ${rows.length===1?"tur":"turer"} importert`);await refresh()}
+      catch(e){$("trSave").disabled=false;showErr("trErr",e)}
+    };
+  };
+  sheet.classList.add("open");draw();
 }
 function openForm(s,kat){
   editing=s||null;
@@ -1171,6 +1223,8 @@ async function importData(file){
 }
 
 function bind(){
+  const pws=document.getElementById("pwSave");if(pws)pws.onclick=async()=>{const v=document.getElementById("newpw").value;if(v.length<8)return toast("Passordet må ha minst 8 tegn");const r=await sb.auth.updateUser({password:v});if(r.error)toast(errText(r.error));else{document.getElementById("newpw").value="";toast("Passordet er lagret")}};
+  const tri=document.getElementById("trImport");if(tri)tri.onclick=openTractive;
   const ns=document.getElementById("nickSave");if(ns)ns.onclick=async()=>{const v=document.getElementById("nick").value.trim();try{ok(await sb.from("profiles").update({nickname:v}).eq("user_id",S.user.id));S.profile.nickname=v;toast("Lagret")}catch(e){toast(errText(e))}};
   if(S.view==="kart"&&S.user){if(!REP.at)loadReports();bindMap()}
   loadImgs();
@@ -1207,6 +1261,15 @@ function bind(){
     const r=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
     if(r.error){send.disabled=false;return showErr("lErr",/signup|not allowed|not found/i.test(r.error.message||"")?{message:"Denne e-posten har ikke tilgang ennå. Appen er foreløpig bare for inviterte."}:r.error)}
     S.loginEmail=email;S.loginSent=true;render();
+  };
+  const lm=document.getElementById("l-mode");if(lm)lm.onclick=()=>{const e=document.getElementById("l-email");if(e)S.loginEmail=e.value.trim();S.pwMode=!S.pwMode;render()};
+  const pwgo=document.getElementById("l-pwgo");
+  if(pwgo)pwgo.onclick=async()=>{
+    const email=document.getElementById("l-email").value.trim(),password=document.getElementById("l-pw").value;
+    if(!email||!password)return showErr("lErr",{message:"Skriv inn e-post og passord."});
+    pwgo.disabled=true;
+    const r=await sb.auth.signInWithPassword({email,password});
+    if(r.error){pwgo.disabled=false;showErr("lErr",/invalid/i.test(r.error.message||"")?{message:"Feil e-post eller passord."}:r.error)}
   };
   const back=document.getElementById("l-back");if(back)back.onclick=()=>{S.loginSent=false;render()};
 

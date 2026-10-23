@@ -373,3 +373,6 @@ a{color:inherit}
 body.anon .login .err::before{background:#fff}
 .warnbox{border-color:var(--ink)}
 .warnbox>b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--bad)}
+
+.trrow{cursor:pointer;gap:10px}
+.trrow.sel{background:var(--soft);border-radius:12px}
