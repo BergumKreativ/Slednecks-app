@@ -184,7 +184,7 @@ function demoScreen(){
   render();
   const open={"ny-okt":()=>openForm(),"ny-okt-meg":()=>openForm(null,"meg"),"endre-okt":()=>openForm(S.sessions[0]),
     "tractive":openTractive,"mal":()=>openGoal(),"tilbakemelding":openFeedback,"dag":()=>openDay(iso(addDays(planStart(),15))),
-    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack}[k];
+    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack,"import":openImport}[k];
   if(open)open();
 }
 const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
@@ -270,6 +270,23 @@ function vWelcome(){
   return `<section class="welcome"><h1 class="brand cond">Velkommen<span>!</span></h1>
   <p>${esc(APP_NAME)} er en treningslogg for deg og hunden. Alt fra turer og kløv til canicross og sledeløp.</p>
   <p class="notice">Dette er en <b>testversjon</b>. Takk for at du er med og gjør appen bedre! Ting kan endre seg underveis.</p>
+  <h2 style="margin-top:22px">Kom i gang</h2>
+  <div class="kig">
+   <div class="kcard"><h3>${icon("route","sm")} Hent inn treningen din</h3>
+    <p class="small">Har du trent allerede denne sesongen? Hent inn øktene fra Strava, klokka eller Tractive, så er loggen og planen oppdatert fra start.</p>
+    ${S.sessions.length?`<p class="small"><b>✓ ${S.sessions.length} økter i loggen</b></p>`:""}
+    <div class="actions" style="margin-top:8px"><button type="button" class="btn line sm" id="wlImport">Importer økter</button></div></div>
+   <div class="kcard"><h3>${icon("paw-print","sm")} Målet for hunden</h3>
+    <p class="small">Trener dere mot et løp, et kløvmerke eller bare gode turer og god form?</p>
+    ${S.profile.raceName?`<p class="small"><b>✓ ${esc(S.profile.raceName)}</b> ${esc(fmtD(parse(S.profile.raceDate)))}</p>`:""}
+    <div class="actions" style="margin-top:8px;flex-wrap:wrap"><button type="button" class="btn line sm" data-goto="innst">Velg løp eller eget mål</button>${S.profile.dogs.length?`<button type="button" class="btn ghost sm" data-dogpage="${esc(S.profile.dogs[0])}">Kløvmerke</button>`:""}</div>
+    <p class="small muted" style="margin-top:6px">Bare turer og form? Da holder det å føre øktene. Ukene og belastningen følges opp på Oversikt.</p></div>
+   <div class="kcard"><h3>${icon("person-standing","sm")} Målet ditt</h3>
+    <p class="small">Hva vil du klare selv? For eksempel Galdhøpiggen med 12 kg sekk, eller 10 km løping på under timen.</p>
+    ${(S.profile.myGoals||[]).map(g=>`<p class="small"><b>✓ ${esc(g.name)}</b></p>`).join("")}
+    <div class="actions" style="margin-top:8px"><button type="button" class="btn line sm" id="wlGoal">${(S.profile.myGoals||[]).length?"Legg til et mål til":"Legg til mål"}</button></div></div>
+  </div>
+  <h2 style="margin-top:22px">Godt å vite</h2>
   <ol class="steps">
    <li><b>Legg appen på hjem-skjermen.</b> ${ios?"I Safari: trykk Del-knappen, og så «Legg til på Hjem-skjerm».":"I Chrome: trykk ⋮-menyen, og så «Legg til på startskjermen». På iPhone: Safari → Del → «Legg til på Hjem-skjerm»."}</li>
    <li><b>Sett opp profilen.</b> Velg et løp fra kalenderen eller lag ditt eget mål, velg gren og legg inn hundene dine. Da får du en treningsplan.</li>
@@ -476,6 +493,7 @@ function vHome(){
   <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${upcomingRaces()}
   ${progressCard(t)}
+  ${S.loaded&&!S.sessions.length?`<p class="notice center" style="margin-top:12px">${icon("route","sm")} Har du trent allerede denne sesongen? <button type="button" class="linkbtn" id="hmImport">Hent inn øktene dine</button></p>`:""}
   ${trackCard()}
   ${trail(bw,t)}
   <section class="week">
@@ -927,8 +945,8 @@ function vLog(){
   const f=S.logFilter||"alle", every=f==="hund"?dogS():f==="meg"?meS():S.sessions, all=every.filter(inSeason), hidden=every.length-all.length;
   const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
   const tabs=`${seasonBar()}${hidden?`<p class="small muted center" style="margin:4px 0 0">${hidden} ${hidden===1?"økt":"økter"} fra andre sesonger er skjult.</p>`:""}<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
-  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
-  return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
+  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="imImport">${icon("route","sm")} Importer økter</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
+  return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="imImport">${icon("route","sm")} Importer økter</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
@@ -1223,6 +1241,78 @@ function saveTrack(){
   draw();
 }
 function discardTrack(){if(!confirm("Slette turen uten å lagre den?"))return;TRK=null;trkStore();render()}
+/* Import fra andre apper: velg kilde, så går brukeren gjennom øktene og velger type og hund før de lagres */
+function openImport(){
+  panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Importer økter</h2><button class="btn ghost" id="imClose">Lukk</button></div>
+  <p class="small muted" style="margin:6px 0 12px">Hent inn trening du har gjort i andre apper. Du ser over hver økt og velger type og hund før noe lagres.</p>
+  <div class="list srcs">
+   <button type="button" class="lrow src" data-src="strava"><span>${icon("route")}</span><span><b>Strava</b><br><span class="small muted">Hele historikken eller enkeltøkter</span></span></button>
+   <button type="button" class="lrow src" data-src="gpx"><span>${icon("map")}</span><span><b>Klokke eller annen app</b><br><span class="small muted">GPX-filer fra Garmin, Suunto, Polar, Coros og andre</span></span></button>
+   <button type="button" class="lrow src" data-src="tractive"><span>${icon("paw-print")}</span><span><b>Tractive</b><br><span class="small muted">GPS-historikken til hunden</span></span></button>
+  </div>`;
+  panel.querySelector("#imClose").onclick=closeForm;
+  panel.querySelectorAll("[data-src]").forEach(b=>b.onclick=()=>b.dataset.src==="tractive"?openTractive():openFileImport(b.dataset.src));
+  sheet.classList.add("open");
+}
+// Start på sesongen, brukt som standard tidsrom for import
+function seasonStart(){
+  const t=todayD(),y=t.getFullYear(),m=t.getMonth()+1,k=season()||autoSeason();
+  if(k==="vinter")return new Date(m===12?y:y-1,11,1);
+  if(k==="sommer")return new Date(m>=6?y:y-1,5,1);
+  return m>=8?new Date(y,7,1):m>=4?new Date(y,3,1):new Date(y-1,7,1);
+}
+function openFileImport(src){
+  const I={list:null,err:"",skipped:0,pick:{},kind:{},from:"season",dogs:S.profile.dogs.slice(0,1)};
+  const exists=a=>S.sessions.some(x=>x.dato===iso(a.start)&&Math.abs((Number(x.km)||0)-a.km)<=Math.max(0.3,a.km*0.08));
+  const since=()=>I.from==="season"?seasonStart():I.from==="3m"?addDays(todayD(),-91):null;
+  const shown=()=>I.list.map((a,i)=>[a,i]).filter(([a])=>!since()||a.start>=since());
+  const typeSel=i=>{const [k,t]=I.kind[i];const opt=(kat,list)=>list.map(x=>`<option value="${kat}|${esc(x)}" ${k===kat&&t===x?"selected":""}>${esc(x)}</option>`).join("");
+    return `<select data-imt="${i}" aria-label="Type økt" style="width:auto;max-width:46%;padding:6px 8px"><optgroup label="Med hund">${opt("hund",TYPES)}</optgroup><optgroup label="Bare meg">${opt("meg",MY_TYPES)}</optgroup></select>`};
+  const hm=d=>d.toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
+  const help=src==="strava"
+    ?`<ol class="small" style="padding-left:20px;margin:8px 0"><li><b>Alt på en gang:</b> logg inn på strava.com i nettleseren → Innstillinger → Min konto → «Last ned eller slett kontoen din» → «Be om arkiv». Du får en e-post med en zip-fil. Pakk den ut og velg <b>activities.csv</b>, gjerne sammen med GPX-filene i mappa activities, så får du ruta også.</li>
+      <li><b>Én og én økt:</b> åpne økta på strava.com, trykk ⋯ og «Eksporter GPX». Du kan velge flere filer samtidig.</li></ol>`
+    :`<p class="small" style="margin:8px 0">Eksporter øktene som <b>GPX</b> fra appen eller nettsiden til klokka (for eksempel Garmin Connect: åpne økta → tannhjulet → «Eksporter til GPX»). Du kan velge mange filer samtidig.</p>`;
+  const draw=()=>{
+    const rows=I.list?shown():[], n=rows.filter(([,i])=>I.pick[i]).length, needDog=rows.some(([,i])=>I.pick[i]&&I.kind[i][0]==="hund");
+    panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">${src==="strava"?"Importer fra Strava":"Importer GPX-filer"}</h2><button class="btn ghost" id="imBack">Tilbake</button></div>
+    ${help}
+    <div class="actions" style="margin-top:6px"><button type="button" class="btn line" id="imPick">${I.list?"Velg andre filer":"Velg filer"}</button></div><input type="file" id="imFile" multiple accept=".csv,.gpx,.gz,text/csv,application/gpx+xml,application/xml,text/xml,application/gzip" hidden>
+    ${I.err?`<p class="err">${esc(I.err)}</p>`:""}
+    ${I.list?`
+     <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="imFrom">Tidsrom</label><select id="imFrom">${[["season",`Denne sesongen (fra ${fmtD(seasonStart())})`],["3m","Siste 3 måneder"],["all","Alt"]].map(([v,l])=>`<option value="${v}" ${I.from===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
+      <div><span class="flabel">Hunder på hundeøktene</span><div class="chips" style="gap:6px">${S.profile.dogs.map(d=>`<button type="button" class="chip" data-imd="${esc(d)}" aria-pressed="${I.dogs.includes(d)}" style="padding:5px 10px">${esc(d)}</button>`).join("")||`<span class="small muted">Ingen hunder i profilen</span>`}</div></div></div>
+     <p class="small muted" style="margin-top:4px">${rows.length} av ${I.list.length} økter i tidsrommet${I.skipped?` · ${I.skipped} filer kunne ikke leses`:""}. Sjekk typen på hver økt. Økter som ser ut til å finnes i loggen fra før, er ikke krysset av.</p>
+     <div class="list">${rows.map(([a,i])=>`<div class="lrow trrow"><input type="checkbox" data-imc="${i}" ${I.pick[i]?"checked":""} aria-label="Importer økta" style="width:auto">
+       <span style="flex:1;min-width:0"><b>${DAYS[(a.start.getDay()+6)%7]} ${fmtD(a.start)}</b> ${hm(a.start)}${a.name?` · ${esc(a.name)}`:""}<br><span class="small muted">${fmtKm(a.km)} km · ${fmtMin(a.min)}${a.hm?` · ${a.hm} hm`:""}${a.stype?` · ${esc(a.stype)}`:""}${a.route?" · rute":""}${exists(a)?" · finnes kanskje":""}</span></span>
+       ${typeSel(i)}</div>`).join("")||`<p class="small muted">Ingen økter i tidsrommet. Velg «Alt» for å se alle.</p>`}</div>
+     ${needDog&&!I.dogs.length?`<p class="small" style="margin-top:8px">Velg hvilke hunder som var med på hundeøktene.</p>`:""}
+     <p class="err" id="imErr" hidden></p>
+     <div class="actions"><button class="btn" id="imSave" ${n&&!(needDog&&!I.dogs.length)?"":"disabled"}>Importer ${n} ${n===1?"økt":"økter"}</button></div>`:""}`;
+    const $=id=>panel.querySelector("#"+id), f=$("imFile");
+    $("imBack").onclick=openImport;$("imPick").onclick=()=>f.click();
+    f.onchange=async()=>{
+      const files=[...f.files];if(!files.length)return;
+      try{const r=await IMPORT.readFiles(files);I.list=r.list;I.skipped=r.skipped;I.err=r.list.length?"":"Fant ingen økter i filene.";I.pick={};I.kind={};
+        I.list.forEach((a,i)=>{I.kind[i]=IMPORT.guess(a,S.profile.dogs);I.pick[i]=!exists(a)})}
+      catch(e){I.list=null;I.err=e.message}
+      draw();
+    };
+    if(!I.list)return;
+    $("imFrom").onchange=e=>{I.from=e.target.value;draw()};
+    panel.querySelectorAll("[data-imd]").forEach(b=>b.onclick=()=>{const d=b.dataset.imd;I.dogs=I.dogs.includes(d)?I.dogs.filter(x=>x!==d):[...I.dogs,d];draw()});
+    panel.querySelectorAll("[data-imc]").forEach(c=>c.onchange=()=>{I.pick[c.dataset.imc]=c.checked;draw()});
+    panel.querySelectorAll("[data-imt]").forEach(c=>c.onchange=()=>{I.kind[c.dataset.imt]=c.value.split("|");draw()});
+    $("imSave").onclick=async()=>{
+      const out=shown().filter(([,i])=>I.pick[i]).map(([a,i])=>{const [kat,type]=I.kind[i],me=kat==="meg";
+        return{dato:iso(a.start),type,km:Math.round(a.km*100)/100,hm:a.hm||0,min:a.min||0,hunder:me?[]:I.dogs.slice(),motivasjon:{},kommentar:a.name||"",kategori:me?"meg":"hund",rute:a.route,kilde:a.src,bilder:[]}});
+      $("imSave").disabled=true;
+      try{ok(await sb.from("okter").insert(out));closeForm();toast(`${out.length} ${out.length===1?"økt":"økter"} importert`);await refresh()}
+      catch(e){$("imSave").disabled=false;showErr("imErr",e)}
+    };
+  };
+  draw();
+}
 /* Tractive-import: posisjonshistorikk (GPX/KML fra my.tractive.com) deles i turer, og brukeren velger hvilke som blir økter */
 const guessType=kmh=>kmh>=13?"Sykkeljøring":kmh>=7?"Canicross":"Gåtur";
 function openTractive(){
@@ -1440,6 +1530,8 @@ async function importData(file){
 function bind(){
   const pws=document.getElementById("pwSave");if(pws)pws.onclick=async()=>{const v=document.getElementById("newpw").value;if(v.length<8)return toast("Passordet må ha minst 8 tegn");const r=await sb.auth.updateUser({password:v});if(r.error)toast(errText(r.error));else{document.getElementById("newpw").value="";toast("Passordet er lagret")}};
   const tri=document.getElementById("trImport");if(tri)tri.onclick=openTractive;
+  ["imImport","wlImport","hmImport"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openImport});
+  const wg=document.getElementById("wlGoal");if(wg)wg.onclick=()=>openGoal();
   const ar=document.getElementById("addRace");if(ar)ar.onclick=openRaceForm;
   document.querySelectorAll("[data-rdel]").forEach(b=>b.onclick=async()=>{const r=(S.profile.races||[]).find(x=>x.id===b.dataset.rdel);if(!r||!confirm(`Fjerne ${r.name}?`))return;try{await saveRaces(S.profile.races.filter(x=>x!==r));render()}catch(e){toast(errText(e))}});
   document.querySelectorAll("[data-rmain]").forEach(b=>b.onclick=async()=>{try{await makeMainRace(b.dataset.rmain)}catch(e){toast(errText(e))}});
