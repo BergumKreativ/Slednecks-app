@@ -40,6 +40,9 @@ alter table public.okter add column if not exists rpe   integer;
 alter table public.okter add column if not exists kropp integer;
 -- Vekt på last: kløv eller kjetting for hund, sekk for deg
 alter table public.okter add column if not exists last_kg numeric;
+-- Vær under økta (temperatur °C og relativ luftfuktighet %)
+alter table public.okter add column if not exists temp numeric;
+alter table public.okter add column if not exists rh   numeric;
 -- Egne mål: [{ id, name, type, km, hm, kg, date }]
 alter table public.profiles add column if not exists my_goals jsonb not null default '[]'::jsonb;
 

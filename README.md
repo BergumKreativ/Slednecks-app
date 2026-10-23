@@ -37,3 +37,7 @@ Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hu
 ## Kløvplan
 
 [pack.js](pack.js) er kløvtreningsplanen etter OMTK-modellen (Eilin Bergum, 2025): vekt i prosent av hundens kroppsvekt, ukedistanse og merkene bronse, sølv og gull.
+
+## Vær og belastning
+
+Vær hentes fra MET Norway (api.met.no, CC BY 4.0) for posisjonen til nettleseren. Varmerisikoen bygger på NHFs barmarksgrenser (16/18 °C) og «150-regelen» (°F + luftfuktighet %). Belastning sammenligner siste 7 dager med snittet av de 4 ukene før; toleransen kan settes per hund.

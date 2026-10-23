@@ -108,7 +108,7 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
 const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
-const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null});
+const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
 const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:0,raceId:"",raceType:"",planType:"",planCustom:{},dogInfo:{},dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
@@ -193,6 +193,8 @@ function vHome(){
       <div><p class="lab muted">Neste langtur</p><p class="what">${next?`${DAYS[(next.d.getDay()+6)%7]} ${fmtD(next.d)}: ${esc(next.txt.replace(/^❄ /,""))}`:"–"}</p></div>
     </div>
   </section>
+  <h2>Vær og varme</h2>
+  ${weatherCard()}
   <h2>Hundene</h2>
   ${S.profile.dogs.length?`<div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
   <div class="row" style="margin-top:28px"><h2 style="margin:0">Deg</h2><button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
@@ -201,6 +203,83 @@ function vHome(){
   ${chart(bw)}`;
 }
 
+/* Vær fra MET Norway (yr). Posisjonen hentes fra nettleseren og huskes på denne enheten. */
+const W={data:null,err:"",loading:false,at:0};
+function savedPos(){try{return JSON.parse(localStorage.getItem("sn-pos")||"null")}catch(e){return null}}
+async function loadWeather(force){
+  const pos=savedPos();
+  if(W.loading||!pos||(!force&&(W.err||W.data&&Date.now()-W.at<30*60e3)))return;
+  W.loading=true;
+  try{
+    const r=await fetch(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${pos.lat.toFixed(3)}&lon=${pos.lon.toFixed(3)}`);
+    if(!r.ok)throw new Error(String(r.status));
+    const d=await r.json();
+    W.data=d.properties.timeseries.slice(0,30).map(x=>({t:new Date(x.time),temp:x.data.instant.details.air_temperature,rh:x.data.instant.details.relative_humidity,wind:x.data.instant.details.wind_speed}));
+    W.at=Date.now();W.err="";
+  }catch(e){W.err="fetch"}
+  W.loading=false;render();
+}
+function askPos(){
+  if(!navigator.geolocation){W.err="denied";render();return}
+  navigator.geolocation.getCurrentPosition(p=>{try{localStorage.setItem("sn-pos",JSON.stringify({lat:p.coords.latitude,lon:p.coords.longitude}))}catch(e){}loadWeather(true)},()=>{W.err="denied";render()},{maximumAge:3600e3,timeout:15000});
+}
+const wxNow=()=>W.data&&(W.data.find(x=>x.t>=new Date(Date.now()-30*60e3))||W.data[0]);
+// Varmerisiko for trekk og aktiv trening. Bygger på NHFs barmarksgrenser (16 og 18 °C) og «150-regelen»
+// (temperatur i °F + luftfuktighet i %). Veiledende: hunder tåler varme ulikt.
+function heatRisk(temp,rh){
+  const sum=temp*9/5+32+(rh||0);
+  const lvl=temp>18?3:(temp>16||sum>=150)?2:(temp>10||sum>=145)?1:0;
+  return {lvl,sum:Math.round(sum)};
+}
+const RISK=[
+  {t:"Gode forhold",c:"ok",tips:["Vanlig trening. Ha likevel med vann på lengre turer."]},
+  {t:"Tilpass treningen",c:"warn",tips:["Kortere økter og roligere tempo.","Gi vann ofte, i små mengder.","Velg skygge og løyper med bekker eller vann der hunden kan kjøle seg ned."]},
+  {t:"Høy varmerisiko",c:"bad",tips:["Tren tidlig om morgenen eller sent på kvelden.","Hold øktene korte og rolige, og stopp før hunden blir sliten.","Over 16 °C kortes barmarksløp ned etter NHFs regler."]},
+  {t:"For varmt for trekk",c:"bad",tips:["Ikke trekktrening nå. NHF avlyser barmarksløp over 18 °C.","Rolig tur i skygge, bading eller hvile i stedet."]},
+];
+const HEAT_SIGNS="Tegn på overoppheting: kraftig pesing, bred og mørk tunge, sikling, vingling eller at hunden vil stoppe. Stopp, finn skygge og kjøl ned med vann (ikke iskaldt). Kontakt veterinær ved tvil.";
+function weatherCard(){
+  if(!savedPos())return `<div class="wx"><p><b>Vær og varme</b></p><p class="small muted">Se temperatur, luftfuktighet og varmerisiko for hundene der du er, og når det er best å trene.</p>
+    ${W.err==="denied"?`<p class="small err">Fikk ikke tilgang til posisjonen. Slå på stedstjenester for nettleseren og prøv igjen.</p>`:""}
+    <div class="actions"><button class="btn line" id="wxPos">Vis vær der jeg er</button></div></div>`;
+  if(!W.data)return `<div class="wx"><p class="small muted">${W.err?"Fikk ikke hentet været. Prøv igjen senere.":"Henter vær …"}</p>${W.err?`<div class="actions"><button class="btn ghost sm" id="wxRetry">Prøv igjen</button></div>`:""}</div>`;
+  const now=wxNow(), r=heatRisk(now.temp,now.rh), R=RISK[r.lvl];
+  const next=W.data.filter(x=>x.t>new Date()&&x.t<new Date(Date.now()+24*3600e3));
+  const best=next.filter(x=>x.t.getHours()>=5&&x.t.getHours()<=22).reduce((a,x)=>!a||heatRisk(x.temp,x.rh).sum<heatRisk(a.temp,a.rh).sum?x:a,null);
+  const hh=d=>d.toLocaleTimeString("nb-NO",{hour:"2-digit",minute:"2-digit"});
+  return `<div class="wx"><div class="row"><b>Vær nå</b><span class="pill ${R.c}">${R.t}</span></div>
+   <div class="wxnow"><span class="cond">${fmtKm(now.temp)}°</span><span>${Math.round(now.rh)} % fuktighet<br>${fmtKm(now.wind)} m/s vind</span></div>
+   <div class="wxbar" aria-label="Varmerisiko neste 24 timer">${next.map(x=>`<i class="r${heatRisk(x.temp,x.rh).lvl}" title="${hh(x.t)}: ${fmtKm(x.temp)}°, ${Math.round(x.rh)} %"></i>`).join("")}</div>
+   <p class="small muted">Neste 24 timer${best&&r.lvl>0?` · svalest/tørrest kl. ${hh(best.t)}: ${fmtKm(best.temp)}°, ${Math.round(best.rh)} %`:""}</p>
+   <ul class="small">${R.tips.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>
+   ${r.lvl>0?`<p class="small muted">${esc(HEAT_SIGNS)}</p>`:""}
+   <p class="small muted" style="margin-top:6px">Veiledende: rase, pels, form og tilvenning betyr mye. Data fra <a href="https://www.met.no/" target="_blank" rel="noopener">MET Norway</a>.</p></div>`;
+}
+
+/* Belastning: siste 7 dager mot snittet av de 4 ukene før (akutt mot kronisk).
+   Hund: km. Deg: minutter × anstrengelse. Toleransen kan justeres per hund, fordi raser og individer tåler ulikt. */
+const TOLERANCE={lav:{t:"Lav",warn:1.2,high:1.4},normal:{t:"Normal",warn:1.3,high:1.5},hoy:{t:"Høy",warn:1.5,high:1.8}};
+function loadStatus(list,val,tol){
+  const t=todayD(), a0=addDays(t,-6), c0=addDays(t,-34);
+  const inR=(s,from,to)=>{const d=parse(s.dato);return d>=from&&d<to};
+  const acute=list.filter(s=>inR(s,a0,addDays(t,1))).reduce((x,s)=>x+val(s),0);
+  const chronic=list.filter(s=>inR(s,c0,a0)).reduce((x,s)=>x+val(s),0)/4;
+  const T=TOLERANCE[tol]||TOLERANCE.normal;
+  if(chronic<=0)return{acute,chronic,ratio:null,lvl:0,t:acute?"For lite historikk ennå. Varsel kommer etter et par uker med logging.":""};
+  const ratio=acute/chronic;
+  const lvl=ratio>=T.high?2:ratio>=T.warn?1:0;
+  const pct=Math.round((ratio-1)*100);
+  return{acute,chronic,ratio,lvl,t:lvl===2?`Kraftig økning: ${pct} % mer enn vanlig siste uke. Vurder en roligere uke.`:lvl===1?`Økning på ${pct} % mot vanlig. Følg med på hvordan kroppen tar det.`:ratio<0.6?"Mindre enn vanlig siste uke. Bygg opp igjen gradvis.":"Belastningen er jevn."};
+}
+const dogLoad=n=>loadStatus(dogS().filter(s=>(s.hunder||[]).includes(n)),s=>Number(s.km)||0,dogInfo(n).tolerance);
+const meLoad=()=>loadStatus(meS(),s=>(Number(s.min)||0)*(Number(s.rpe)||5),"normal");
+function loadBox(L,unit){
+  if(!L.t)return "";
+  const max=Math.max(L.acute,L.chronic,1);
+  return `<div class="load"><p class="small ${L.lvl===2?"err":L.lvl===1?"warntext":"muted"}">${L.lvl?"⚠ ":""}${esc(L.t)}</p>
+   ${L.ratio!=null?`<div class="lbar"><span>Siste 7 dager</span><div class="bar"><span class="${L.lvl===2?"hi":L.lvl===1?"mid":""}" style="width:${L.acute/max*100}%"></span></div><b>${unit(L.acute)}</b></div>
+   <div class="lbar"><span>Vanlig uke</span><div class="bar"><span class="base" style="width:${L.chronic/max*100}%"></span></div><b>${unit(L.chronic)}</b></div>`:""}</div>`;
+}
 function meCard(t){
   const mon=monday(t), wk=meS().filter(s=>parse(s.dato)>=mon), d28=meS().filter(s=>parse(s.dato)>addDays(t,-28));
   const withDog=dogS().filter(s=>parse(s.dato)>=mon&&ACTIVE_WITH_DOG.includes(typeOf(s.type)));
@@ -209,6 +288,7 @@ function meCard(t){
   if(!meS().length&&!withDog.length)return `<p class="notice">Logg din egen trening her, som løping, styrke og ski. Den holdes adskilt fra hundenes ukemål. Trykk «+ Egen økt» for å starte.</p>${goals}`;
   return `<div class="stats" style="margin-top:10px"><div><span class="cond">${wk.length}</span><small>økter denne uka</small></div><div><span class="cond">${fmtMin(sum(wk,"min")).replace(" min","m").replace(" t ","t ")}</span><small>tid</small></div>
    <div><span class="cond">${avg!=null?String(avg).replace(".",","):"–"}</span><small>snitt anstrengelse</small></div><div><span class="cond">${d28.length}</span><small>økter siste 4 uker</small></div></div>
+   ${loadBox(meLoad(),v=>Math.round(v)+" p")}
    ${withDog.length?`<p class="small muted" style="margin-top:8px">I tillegg har du vært aktiv med hundene i ${fmtMin(sum(withDog,"min"))} denne uka (canicross, skijøring, sykkel, gåtur, kløv).</p>`:""}${goals}`;
 }
 /* Egne mål, f.eks. fjelltur med tung sekk. Fremgang regnes fra egne økter av samme type. */
@@ -415,6 +495,10 @@ function vDog(){
   <p class="small muted" style="margin-top:8px">BCS (body condition score) går fra 1 til 9, der 4–5 er ideelt. Du skal lett kunne kjenne ribbeina, og se en tydelig midje ovenfra.</p>
   ${ws.length?`<div class="list">${ws.map(w=>`<div class="lrow"><span>${fmtD(parse(w.d))} ${parse(w.d).getFullYear()}</span><span>${w.kg?`<b>${fmtKm(w.kg)} kg</b>`:""}${w.bcs?` · BCS ${w.bcs}`:""}</span><button type="button" class="btn ghost sm" data-wdel="${esc(w.id)}" aria-label="Slett måling">Slett</button></div>`).join("")}</div>`:""}
 
+  <h2>Belastning</h2>
+  ${loadBox(dogLoad(n),v=>fmtKm(v)+" km")||`<p class="muted small">Logg noen økter, så ser du hvordan belastningen utvikler seg.</p>`}
+  <div class="field"><label for="i-tol">Hvor mye tåler ${esc(n)} av økning?</label><select id="i-tol">${Object.entries(TOLERANCE).map(([k,v])=>`<option value="${k}" ${(i.tolerance||"normal")===k?"selected":""}>${v.t} – varsel ved ${Math.round((v.warn-1)*100)} % økning</option>`).join("")}</select></div>
+  <p class="small muted" style="margin-top:6px">Sammenligner km siste 7 dager med snittet av de 4 ukene før. Veiledende: rase, alder, form og underlag gjør at hunder tåler ulikt. Velg «lav» for unge, eldre eller hunder som kommer tilbake etter skade.</p>
   ${packSection(n)}
 
   <h2>Vaksinekort</h2>
@@ -446,7 +530,8 @@ function dogCard(n){
   return `<button type="button" class="dog" data-dogpage="${esc(n)}"><div class="name">${esc(n)}</div><div class="km">${fmtKm(sum(mine,"km"))} km</div>
     <p class="muted small">${fmtKm(sum(wk,"km"))} km denne uka<br>${mine.length} økter${longest?` · lengste ${fmtKm(longest)} km`:""}${lw?`<br>${fmtKm(lw.kg)} kg${lw.bcs?` · BCS ${lw.bcs}`:""}`:""}</p>
     ${moods.length?`<div class="mood" aria-label="Siste motivasjon">${moods.map(m=>`<i class="m${m}"></i>`).join("")}</div>`:""}
-    ${warn.length?`<p class="small dogwarn">⚠ ${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}</button>`;
+    ${warn.length?`<p class="small dogwarn">⚠ ${warn.length===1?esc(warn[0]):`${warn.length} ting å sjekke`}</p>`:""}
+    ${(L=>L.lvl?`<p class="small ${L.lvl===2?"dogwarn":"warntext"}">📈 ${L.lvl===2?"Kraftig økning":"Økt belastning"} siste uke</p>`:"")(dogLoad(n))}</button>`;
 }
 
 function trail(bw,t){
@@ -485,7 +570,7 @@ function vLog(){
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
-      <span><span class="t">${esc(typeOf(s.type,s.kategori))}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
+      <span><span class="t">${esc(typeOf(s.type,s.kategori))}</span>${s.min?` <span class="muted">· ${fmtMin(s.min)}</span>`:""}<span class="s">${me?`Bare meg${s.rpe?` · anstrengelse ${s.rpe}/10`:""}${s.kropp?` · ${(KROPP.find(k=>k[0]===s.kropp)||[,""])[1].toLowerCase()}`:""}`:esc((s.hunder||[]).join(", "))}${s.hm?` · ${Math.round(s.hm)} hm`:""}${s.last_kg?` · ${fmtKm(s.last_kg)} kg ${me?"sekk":"last"}`:""}${s.temp!=null?` · ${fmtKm(s.temp)}°${s.rh!=null?` ${s.rh} %`:""}`:""}${s.kommentar?` · ${esc(s.kommentar)}`:""}</span></span>
       <span class="k">${s.km?fmtKm(s.km):""}</span></button>`}).join("")}</section>`}).join("");
 }
 
@@ -592,7 +677,8 @@ function openForm(s,kat){
   const last=dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0];
   F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkeljøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:"",kategori:kat||"hund",rpe:null,kropp:null};
   if(!s&&kat==="meg")F.type=(meS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Løping";
-  F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
+  F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);
+  if(!s){const w=wxNow();if(w){F.temp=fmtKm(w.temp);F.rh=Math.round(w.rh)}}F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
   if(!F.min)F.min="";if(!F.hm)F.hm="";
   draw();sheet.classList.add("open");
 }
@@ -607,6 +693,9 @@ function draw(){
   <div class="field grid3"><div><label for="f-km">Km</label><input id="f-km" inputmode="decimal" value="${esc(F.km)}" placeholder="0"></div>
    <div><label for="f-hm">Høydemeter</label><input id="f-hm" inputmode="numeric" value="${esc(F.hm)}" placeholder="0"></div>
    <div><label for="f-min">Minutter</label><input id="f-min" inputmode="numeric" value="${esc(F.min)}" placeholder="0"></div></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="f-temp">Temperatur (°C)</label><input id="f-temp" inputmode="decimal" value="${esc(F.temp??"")}" placeholder="–"></div>
+   <div><label for="f-rh">Luftfuktighet (%)</label><input id="f-rh" inputmode="numeric" value="${esc(F.rh??"")}" placeholder="–"></div></div>
+  ${F.temp!==""&&F.temp!=null&&!me&&heatRisk(num(F.temp),num(F.rh)).lvl>=2?`<p class="small err" style="margin-top:6px">⚠ ${RISK[heatRisk(num(F.temp),num(F.rh)).lvl].t} for hundene ved denne temperaturen.</p>`:""}
   ${me||LOAD_LABEL[F.type]?`<div class="field"><label for="f-kg">${me?"Sekk (kg)":LOAD_LABEL[F.type]}</label><input id="f-kg" inputmode="decimal" value="${esc(F.last_kg??"")}" placeholder="${me?"Ingen sekk":"0"}"></div>`:""}
   ${me?`<div class="field"><span class="flabel">Hvor hardt var det? <span class="muted" style="font-weight:400">(1 = veldig lett, 10 = maks)</span></span><div class="chips rpe">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<button type="button" class="chip" data-rpe="${v}" aria-pressed="${F.rpe===v}">${v}</button>`).join("")}</div></div>
   <div class="field"><span class="flabel">Hvordan kjentes kroppen?</span><div class="chips">${KROPP.map(([v,l])=>`<button type="button" class="chip" data-kropp="${v}" aria-pressed="${F.kropp===v}">${l}</button>`).join("")}</div></div>`:`<div class="field"><span class="flabel">Hunder med</span><div class="chips">${dogs.map(d=>`<button type="button" class="chip" data-dog="${esc(d)}" aria-pressed="${F.hunder.includes(d)}">${esc(d)}</button>`).join("")}</div></div>`}
@@ -614,7 +703,7 @@ function draw(){
   <div class="field"><label for="f-kom">Kommentar</label><textarea id="f-kom" placeholder="${me?"Hva du gjorde, hvordan det gikk …":"Føre, vær, poter, hvordan det gikk …"}">${esc(F.kommentar)}</textarea></div>
   <p class="err" id="fErr" hidden></p>
   <div class="actions">${editing?`<button class="btn del" id="fDel">Slett</button>`:""}<button class="btn" id="fSave">${editing?"Lagre endringer":"Lagre økt"}</button></div>`;
-  const keep=()=>{const kgEl=panel.querySelector("#f-kg");if(kgEl)F.last_kg=kgEl.value;F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
+  const keep=()=>{const kgEl=panel.querySelector("#f-kg");if(kgEl)F.last_kg=kgEl.value;F.temp=panel.querySelector("#f-temp").value;F.rh=panel.querySelector("#f-rh").value;F.dato=panel.querySelector("#f-dato").value;F.km=panel.querySelector("#f-km").value;F.hm=panel.querySelector("#f-hm").value;F.min=panel.querySelector("#f-min").value;F.kommentar=panel.querySelector("#f-kom").value};
   panel.querySelector("#fClose").onclick=closeForm;
   panel.querySelector("#f-dato").onchange=()=>{keep();draw()};
   panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");draw()});
@@ -650,7 +739,7 @@ function openDay(date){
   const r=panel.querySelector("#dReset");if(r)r.onclick=()=>put(null);
 }
 const num=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:0};
-const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null}};
+const toRow=s=>{const me=s.kategori==="meg";return{dato:s.dato,type:typeOf(s.type,s.kategori),km:num(s.km),hm:Math.round(num(s.hm)),min:Math.round(num(s.min)),hunder:me?[]:s.hunder||[],motivasjon:me?{}:s.motivasjon||{},kommentar:String(s.kommentar||"").trim(),kategori:me?"meg":"hund",rpe:me&&s.rpe?Number(s.rpe):null,kropp:me&&s.kropp?Number(s.kropp):null,last_kg:(me||LOAD_LABEL[typeOf(s.type)])&&num(s.last_kg)?num(s.last_kg):null,temp:String(s.temp??"").trim()!==""?num(s.temp):null,rh:String(s.rh??"").trim()!==""?Math.round(num(s.rh)):null}};
 async function save(){
   if(!F.dato)return showErr("fErr",{message:"Velg en dato."});
   if(!num(F.km)&&!num(F.min)&&!F.kommentar.trim())return showErr("fErr",{message:"Skriv inn km, minutter eller en kommentar."});
@@ -687,6 +776,7 @@ function bindDog(){
   };
   document.querySelectorAll("[data-vdel]").forEach(b=>b.onclick=()=>{if(!confirm("Slette denne vaksinen?"))return;const i=dogInfo(n);save({...i,vaccines:(i.vaccines||[]).filter(v=>v.id!==b.dataset.vdel)},"Vaksinen er slettet")});
   const ps=$("pkStart");if(ps)ps.onclick=()=>{const d=$("pk-start").value;if(!d)return showErr("dogErr",{message:"Velg når uke 1 starter."});save({...dogInfo(n),packStart:iso(monday(parse(d)))},"Kløvplanen er startet")};
+  $("i-tol").onchange=()=>save({...dogInfo(n),tolerance:$("i-tol").value},"Lagret");
   const pst=$("pkStop");if(pst)pst.onclick=()=>{if(!confirm("Avslutte kløvplanen? Øktene dine blir liggende."))return;const i={...dogInfo(n)};delete i.packStart;save(i,"Kløvplanen er avsluttet")};
   $("iSave").onclick=()=>{
     const chip=$("i-chip").value.replace(/\s/g,"");
@@ -716,6 +806,9 @@ async function importData(file){
 }
 
 function bind(){
+  const wp=document.getElementById("wxPos");if(wp)wp.onclick=askPos;
+  const wr=document.getElementById("wxRetry");if(wr)wr.onclick=()=>{W.err="";loadWeather(true);render()};
+  if(S.user&&S.view==="hjem")loadWeather();
   const ag=document.getElementById("addGoal");if(ag)ag.onclick=()=>openGoal();
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
