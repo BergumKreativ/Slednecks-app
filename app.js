@@ -114,7 +114,7 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
-const APP_NAME=window.APP_NAME||"Spåtind"; // Arbeidsnavn – endres ett sted i index.html
+const APP_NAME=window.APP_NAME||"Slednecks"; // Arbeidsnavn – endres ett sted i index.html
 // Demomodus (window.APP_DEMO): viser appen med eksempeldata uten innlogging. Ingenting lagres.
 const DEMO=window.APP_DEMO===true;
 function demoClient(){
@@ -170,12 +170,12 @@ function render(){
 }
 
 function vSetup(){
-  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.15" alt="${esc(APP_NAME)}"></h1>
+  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.16" alt="${esc(APP_NAME)}"></h1>
   <p class="notice">Appen er ikke koblet til databasen ennå. Fyll inn Supabase-adressen og «anon public»-nøkkelen i <b>config.js</b>.</p></section>`;
 }
 
 function vLogin(){
-  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.15" alt="${esc(APP_NAME)}"></h1>
+  return `<section class="login"><h1 class="brand"><img src="logo-hvit.svg?v=0.9.16" alt="${esc(APP_NAME)}"></h1>
   ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
