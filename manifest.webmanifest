@@ -1,6 +1,6 @@
 {
-  "name": "Slednecks – trening for deg og hunden",
-  "short_name": "Slednecks",
+  "name": "SagaTrail – trening for deg og hunden",
+  "short_name": "SagaTrail",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

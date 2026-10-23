@@ -1,6 +1,6 @@
-# Slednecks – trening for deg og hunden
+# SagaTrail – trening for deg og hunden
 
-(Arbeidsnavn – endelig navn er ikke bestemt. Navnet settes i `index.html` som `window.APP_NAME`.)
+(Navnet er SagaTrail. Det settes i `index.html` som `window.APP_NAME`, og logoen ligger i `logo-hvit.svg` og `design/`. Repoet og Supabase-prosjektet heter fortsatt Slednecks.)
 
 Nettapp for å føre og følge opp treningsøkter med hundene frem mot løpet. Ren HTML/JS uten byggesteg, med Supabase som database og innlogging.
 

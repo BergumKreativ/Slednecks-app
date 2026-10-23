@@ -114,7 +114,7 @@ const todayD=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
 
 /* Supabase */
 const CFG=window.SLEDNECKS_CONFIG||{};
-const APP_NAME=window.APP_NAME||"Slednecks"; // Arbeidsnavn – endres ett sted i index.html
+const APP_NAME=window.APP_NAME||"SagaTrail"; // Arbeidsnavn – endres ett sted i index.html
 // Demomodus (window.APP_DEMO): viser appen med eksempeldata uten innlogging. Ingenting lagres.
 const DEMO=window.APP_DEMO===true;
 // Demo: #skjerm i adressen viser én bestemt side eller ett skjema (brukes av skjermoversikten)
@@ -124,7 +124,7 @@ function demoClient(){
   const chain=()=>new Proxy(()=>{},{get:(t,k)=>k==="then"?(f,r)=>Promise.resolve(res).then(f,r):()=>chain(),apply:()=>chain()});
   return{from:()=>chain(),rpc:()=>chain(),
     storage:{from:()=>({upload:async()=>res,remove:async()=>res,createSignedUrls:async()=>({data:[],error:null})})},
-    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@spatind.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
+    auth:{onAuthStateChange:cb=>setTimeout(()=>cb("SIGNED_IN",DEMO_SCREEN==="innlogging"?null:{user:{id:"demo",email:"demo@sagatrail.no"}}),0),signOut:async()=>{toast("Demo: utlogging er slått av")},signInWithOtp:async()=>res,verifyOtp:async()=>res}};
 }
 const sb=DEMO?demoClient():CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseAnonKey):null;
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||"",kategori:r.kategori==="meg"?"meg":"hund",rpe:r.rpe||null,kropp:r.kropp||null,last_kg:r.last_kg!=null?Number(r.last_kg):null,temp:r.temp!=null?Number(r.temp):null,rh:r.rh!=null?Number(r.rh):null,rute:Array.isArray(r.rute)?r.rute:null,kilde:r.kilde||"",bilder:Array.isArray(r.bilder)?r.bilder:[]});
