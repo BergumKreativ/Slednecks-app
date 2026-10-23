@@ -326,7 +326,10 @@ h3.t-me{color:inherit}
 .pill.ok,.pill.warn,.pill.bad{background:var(--soft)}
 
 /* Innlogging på solnedgang */
-body.anon{background:linear-gradient(160deg,#A80D26 0%,#C2381A 55%,#E8862E 100%) fixed;color:#fff;min-height:100vh}
+/* Gradienten ligger i et eget fast lag, fordi iPhone ikke støtter «background-attachment: fixed» og ellers kutter den når siden er høyere enn skjermen */
+body.anon{background:transparent;color:#fff;min-height:100vh;min-height:100dvh}
+body.anon::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(160deg,#A80D26 0%,#C2381A 55%,#E8862E 100%)}
+html:has(body.anon){background:#C2381A}
 body.anon::before{background:transparent}
 body.anon .login{padding-top:14vh}
 body.anon .login .brand img{width:min(58vw,250px);height:auto;display:block;margin:0 auto 18px}

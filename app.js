@@ -1385,9 +1385,9 @@ sheet.addEventListener("click",e=>{if(e.target===sheet)closeForm()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeForm()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh()});
 
-// Startskjerm: skjules når innloggingsstatus er kjent, men vises minst 900 ms
+// Startskjerm: skjules når innloggingsstatus er kjent, men vises minst 2,5 s så animasjonen rekker å bli ferdig
 const SPLASH_T0=Date.now();
-function hideSplash(){if(DEMO_SCREEN==="start")return;const el=document.getElementById("splash");if(!el||el.classList.contains("hide"))return;setTimeout(()=>{el.classList.add("hide");setTimeout(()=>el.remove(),600)},Math.max(0,900-(Date.now()-SPLASH_T0)))}
+function hideSplash(){if(DEMO_SCREEN==="start")return;const el=document.getElementById("splash");if(!el||el.classList.contains("hide"))return;setTimeout(()=>{el.classList.add("hide");setTimeout(()=>el.remove(),600)},Math.max(0,2500-(Date.now()-SPLASH_T0)))}
 const NAV_ICONS={hjem:"house",logg:"list",plan:"calendar-days",innst:"user"};
 document.querySelectorAll(".tab").forEach(t=>{t.innerHTML=`${icon(NAV_ICONS[t.dataset.v])}<span>${t.textContent}</span>`});
 document.getElementById("addBtn").innerHTML=icon("plus");
