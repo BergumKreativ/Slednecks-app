@@ -339,17 +339,18 @@ body.anon .login a,body.anon .login .linkbtn{color:#fff}
 body.anon .login .err{color:#fff;background:rgba(0,0,0,.25);border-radius:12px;padding:8px 12px}
 body.anon .prose{color:var(--ink);background:var(--bg);border-radius:22px;padding:16px;margin-top:8px}
 
-/* Typografi: Hanken Grotesk (nær Calibre). Tynne overskrifter og tall, lesbar brødtekst. */
+/* Typografi: Hanken Grotesk. Kontrast mellom fete overskrifter og tynne, store tall. */
 :root{--font:"Hanken Grotesk","Helvetica Neue",Arial,system-ui,sans-serif}
-body{font-family:var(--font);font-weight:380;letter-spacing:.005em}
-h1,h2,h3{font-weight:400;letter-spacing:-.01em}
+body{font-family:var(--font);font-weight:420;letter-spacing:.003em}
+h1,h2,h3{font-weight:700;letter-spacing:-.015em}
 h2{font-size:1.4rem}
 .cond{font-weight:300}
 .count{font-weight:200;letter-spacing:-.03em}
-.count small{font-weight:350;letter-spacing:.01em}
+.count small{font-weight:600;letter-spacing:.01em}
 .stats .cond,.dog .km,.entry .k,.goalrow .v,.prog .big{font-weight:300}
-.dog .name,.wkhead h3,.entry .d{font-weight:500}
-.btn{font-weight:550;letter-spacing:.01em}
-.tab{font-weight:450;font-size:.92rem}
-.chip,.flabel,.field label{font-weight:500}
-b,strong{font-weight:600}
+.dog .name,.wkhead h3,.entry .d,.entry .t{font-weight:700}
+.btn{font-weight:700;letter-spacing:.01em}
+.tab{font-weight:600;font-size:.92rem}
+.chip,.flabel,.field label{font-weight:600}
+.muted,.small{font-weight:420}
+b,strong{font-weight:700}
