@@ -4,9 +4,14 @@
 create table if not exists public.profiles (
   user_id   uuid primary key references auth.users(id) on delete cascade default auth.uid(),
   race_date date not null default '2027-01-09',
-  dogs      jsonb not null default '["Saga","Timi","Lånehund 1","Lånehund 2"]'::jsonb,
+  dogs      jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
+-- Eget mål per bruker
+alter table public.profiles add column if not exists race_name text not null default '';
+alter table public.profiles add column if not exists race_km   numeric not null default 30;
+alter table public.profiles add column if not exists race_hm   integer not null default 500;
+alter table public.profiles alter column dogs set default '[]'::jsonb;
 
 create table if not exists public.okter (
   id         uuid primary key default gen_random_uuid(),

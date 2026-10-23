@@ -27,3 +27,5 @@ Legg mappa i et GitHub-repo, og slå på Settings → Pages → *Deploy from a b
 ## Tilgang
 
 Registrering er stengt (Supabase → Authentication → Sign In / Providers → *Allow new users to sign up* er av). Nye brukere legges til under Authentication → Users → *Add user* → *Send invitation*. Hver bruker har sin egen logg.
+
+Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hunder under **Profil**. Treningsplanen på 11 uker skaleres fra malen i `app.js` (TEMPLATE, laget for 60 km / 1500 hm).

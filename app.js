@@ -1,21 +1,36 @@
-const H=["Hvile",0,0], E=["Egentrening / løs tur",0,0];
-const PLAN=[
- {f:"Grunnlag",d:[H,["Rolig 12 km – test lånehundene",12,150],E,["Bakker 10 km – rolig opp, gå ned",10,250],H,["Langtur 25 km rolig",25,500],["Rolig 12 km",12,150]]},
- {f:"Grunnlag",d:[H,["Rolig 12 km",12,150],E,["Bakker 12 km",12,300],H,["Langtur 30 km – snacks hver time",30,650],["Rolig 12 km",12,150]]},
- {f:"Grunnlag",d:[H,["Rolig 14 km",14,200],E,["Bakker 12 km",12,350],H,["Langtur 32 km",32,700],["Rolig 15 km",15,200]]},
- {f:"Lett uke",d:[H,["Lett 10 km",10,100],H,["Lett 10 km",10,150],H,["Kort langtur 20 km",20,400],["Lett 10 km eller hvile",10,100]]},
- {f:"Spesifikt",d:[H,["Rolig 15 km",15,200],E,["Bakker 12 km",12,400],H,["❄ Langtur 35 km – hytta på slede hvis snø",35,800],["❄ Back-to-back 20 km",20,400]]},
- {f:"Spesifikt – toppuke",d:[H,["Rolig 15 km",15,200],E,["Bakker 14 km",14,400],H,["❄ Langtur 40 km – start i mørket",40,900],["❄ Back-to-back 20 km",20,400]]},
- {f:"Spesifikt",d:[H,["Rolig 15 km",15,200],E,["Bakker 12 km",12,350],H,["❄ Langtur 30 km",30,650],["Rolig 15 km",15,200]]},
- {f:"Generalprøve",d:[H,["Rolig 12 km",12,150],E,["Lett 10 km",10,150],H,["❄ Generalprøve 45–50 km på snø – alt som på løpsdagen",48,1100],H]},
- {f:"Jul – hent deg inn",d:[H,H,["Lett 10 km – sjekk poter og rygg",10,100],["Hvile",0,0],H,["❄ Langtur 25 km – Sjusjøen/hytta",25,500],["❄ Rolig 12 km",12,150]]},
- {f:"Nedtrapping",d:[H,["Rolig 15 km",15,300],H,["Lett 10 km",10,150],["Hvile",0,0],["❄ Rolig 15 km – siste snøtur, kort og lett",15,300],H]},
- {f:"Løpsuke",d:[H,["Kort 8 km – litt fart, glade hunder",8,100],H,["Kort 6 km",6,50],["Hvile / reise",0,0],["Løpet 60 km / 1500 hm",60,1500],["Hvile og restitusjon",0,0]]},
+/* Planmal for et løp på 60 km / 1500 hm over 11 uker. Skaleres etter hver brukers løp i buildPlan().
+   Økt: [navn, km, hm, merknad, snø]. "H" = hvile, "E" = egentrening, "R" = løpsdagen. */
+const H="H", E="E", R="R";
+const TEMPLATE=[
+ {f:"Grunnlag",d:[H,["Rolig",12,150,"test hundene"],E,["Bakker",10,250,"rolig opp, gå ned"],H,["Langtur",25,500,"rolig"],["Rolig",12,150]]},
+ {f:"Grunnlag",d:[H,["Rolig",12,150],E,["Bakker",12,300],H,["Langtur",30,650,"snacks hver time"],["Rolig",12,150]]},
+ {f:"Grunnlag",d:[H,["Rolig",14,200],E,["Bakker",12,350],H,["Langtur",32,700],["Rolig",15,200]]},
+ {f:"Lett uke",d:[H,["Lett",10,100],H,["Lett",10,150],H,["Kort langtur",20,400],["Lett eller hvile",10,100]]},
+ {f:"Spesifikt",d:[H,["Rolig",15,200],E,["Bakker",12,400],H,["Langtur",35,800,"på slede hvis snø",1],["Back-to-back",20,400,"",1]]},
+ {f:"Spesifikt – toppuke",d:[H,["Rolig",15,200],E,["Bakker",14,400],H,["Langtur",40,900,"start i mørket",1],["Back-to-back",20,400,"",1]]},
+ {f:"Spesifikt",d:[H,["Rolig",15,200],E,["Bakker",12,350],H,["Langtur",30,650,"",1],["Rolig",15,200]]},
+ {f:"Generalprøve",d:[H,["Rolig",12,150],E,["Lett",10,150],H,["Generalprøve",48,1100,"alt som på løpsdagen",1,1],H]},
+ {f:"Hent deg inn",d:[H,H,["Lett",10,100,"sjekk poter og rygg"],H,H,["Langtur",25,500,"",1],["Rolig",12,150,"",1]]},
+ {f:"Nedtrapping",d:[H,["Rolig",15,300],H,["Lett",10,150],H,["Rolig",15,300,"siste langtur, kort og lett",1],H]},
+ {f:"Løpsuke",d:[H,["Kort",8,100,"litt fart, glade hunder"],H,["Kort",6,50],["Hvile / reise",0,0],R,["Hvile og restitusjon",0,0]]},
 ];
+// PLAN[uke].d[dag] = [tekst, km, hm, nøkkeløkt]
+let PLAN=[];
+function buildPlan(){
+  const p=S.profile, fk=(Number(p.raceKm)||60)/60, fh=(Number(p.raceHm)||0)/1500;
+  PLAN=TEMPLATE.map(w=>({f:w.f,d:w.d.map(x=>{
+    if(x===H)return["Hvile",0,0];
+    if(x===E)return["Egentrening / løs tur",0,0];
+    if(x===R)return[`${p.raceName||"Løpet"} ${fmtKm(p.raceKm)} km${p.raceHm?` / ${p.raceHm} hm`:""}`,Number(p.raceKm)||0,Number(p.raceHm)||0,1];
+    const [name,km,hm,note,snow,key]=x;
+    if(!km)return[name,0,0];
+    const k=Math.max(2,Math.round(km*fk)), h=Math.round(hm*fh/50)*50;
+    return[`${snow?"❄ ":""}${name} ${k} km${note?" – "+note:""}`,k,h,key?1:0];
+  })}));
+}
 const TYPES=["Sykkeljøring","Canicross","Vogn / ATV","Hundekjøring","Skijøring","Kløv","Tur","Annet"];
 const ALIAS={"Terrengsykkel":"Sykkeljøring","Sykkel":"Sykkeljøring","El-sykkel":"Sykkeljøring","Løping":"Canicross","Gåtur":"Tur","Slede":"Hundekjøring","Vogn":"Vogn / ATV"};
 const typeOf=t=>ALIAS[t]||(TYPES.includes(t)?t:"Annet");
-const DEFAULT_DOGS=["Saga","Timi","Lånehund 1","Lånehund 2"];
 const DAYS=["man","tir","ons","tor","fre","lør","søn"];
 const MOODS=[[3,"Stram line"],[2,"Ok"],[1,"Slakk"]];
 
@@ -37,26 +52,31 @@ const sb=CFG.supabaseUrl&&CFG.supabaseAnonKey&&window.supabase?window.supabase.c
 const rowToSession=r=>({id:r.id,dato:r.dato,type:r.type,km:Number(r.km)||0,hm:r.hm||0,min:r.min||0,hunder:r.hunder||[],motivasjon:r.motivasjon||{},kommentar:r.kommentar||""});
 const ok=r=>{if(r.error)throw r.error;return r.data};
 
-const S={view:"hjem",sessions:[],profile:{raceDate:"2027-01-09",dogs:DEFAULT_DOGS.slice()},user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
+const S={view:"hjem",sessions:[],profile:{raceDate:iso(addDays(new Date(),84)),raceName:"",raceKm:30,raceHm:500,dogs:[]},isNew:false,user:null,authReady:false,loaded:false,loginEmail:"",loginSent:false};
 try{const v=location.hash.slice(1);if(["hjem","logg","plan","innst"].includes(v))S.view=v}catch(e){}
 
 async function loadAll(){
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,dogs:Array.isArray(prof.dogs)&&prof.dogs.length?prof.dogs.slice():S.profile.dogs};
-  else ok(await sb.from("profiles").insert({race_date:S.profile.raceDate,dogs:S.profile.dogs}));
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  else{
+    ok(await sb.from("profiles").insert(profileRow(S.profile)));
+    S.isNew=true;S.view="innst";
+  }
   S.sessions=ok(o).map(rowToSession);
   S.loaded=true;render();
 }
+const profileRow=p=>({race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,dogs:p.dogs});
 async function refresh(){try{await loadAll()}catch(e){toast(errText(e))}}
 
 const planStart=()=>addDays(monday(parse(S.profile.raceDate)),-70);
-function planWeekIdx(date){const i=Math.round((monday(date)-planStart())/864e5/7);return i>=0&&i<11?i:-1}
+function planWeekIdx(date){const i=Math.round((monday(date)-planStart())/864e5/7);return i>=0&&i<TEMPLATE.length?i:-1}
 function planDay(date){const i=planWeekIdx(date);if(i<0)return null;const d=(date.getDay()+6)%7;return{w:i,d,item:PLAN[i].d[d]}}
 const weekTotals=i=>{const d=PLAN[i].d;return{km:d.reduce((a,x)=>a+x[1],0),hm:d.reduce((a,x)=>a+x[2],0),n:d.filter(x=>x[1]>0).length}};
 const byWeek=()=>{const m={};for(const s of S.sessions){const k=iso(monday(parse(s.dato)));(m[k]=m[k]||[]).push(s)}return m};
 
 function render(){
+  buildPlan();
   document.body.classList.toggle("anon",!S.user);
   document.querySelectorAll(".tab").forEach(t=>{if(t.dataset.v===S.view)t.setAttribute("aria-current","page");else t.removeAttribute("aria-current")});
   const app=document.getElementById("app");
@@ -103,7 +123,7 @@ function vHome(){
   let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&S.sessions.some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `
-  <section>${hero}<p class="race">Mush-løpet ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – 60 km og 1500 høydemeter</p></section>
+  <section>${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
   ${progressCard(t)}
   ${trail(bw,t)}
   <section class="week">
@@ -115,7 +135,7 @@ function vHome(){
     </div>
   </section>
   <h2>Hundene</h2>
-  <div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>
+  ${S.profile.dogs.length?`<div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
   <h2>Uke for uke</h2>
   ${chart(bw)}`;
 }
@@ -126,7 +146,7 @@ function progressCard(t){
   const inPlan=S.sessions.filter(s=>{const d=parse(s.dato);return d>=ps&&d<=end});
   const done=sum(inPlan,"km"), fk=Math.min(1,done/total);
   const span=Math.round((race-ps)/864e5), gone=Math.min(span,Math.max(0,Math.round((t-ps)/864e5))), ft=span?gone/span:0;
-  const wkNo=Math.min(11,Math.max(0,Math.floor((t-ps)/864e5/7)+1));
+  const wkNo=Math.min(PLAN.length,Math.max(0,Math.floor((t-ps)/864e5/7)+1));
   const R1=56,R2=40,C1=2*Math.PI*R1,C2=2*Math.PI*R2;
   const started=t>=ps;
   const before=sum(S.sessions.filter(s=>parse(s.dato)<ps),"km");
@@ -145,7 +165,7 @@ function progressCard(t){
     <div>
       <h3>Mot målet</h3>
       <div class="li"><span class="sw" style="background:var(--orange)"></span><span><span class="big">${fmtKm(done)}</span> <span class="muted">av ${total} km kjørt</span></span></div>
-      <div class="li"><span class="sw" style="background:var(--ink)"></span><span><span class="big">${started?`Uke ${wkNo}`:"Uke 0"}</span> <span class="muted">av 11</span></span></div>
+      <div class="li"><span class="sw" style="background:var(--ink)"></span><span><span class="big">${started?`Uke ${wkNo}`:"Uke 0"}</span> <span class="muted">av ${PLAN.length}</span></span></div>
       <p class="small" style="margin-top:10px">${status}</p>
       ${before?`<p class="small muted" style="margin-top:4px">${fmtKm(before)} km trent før planen startet.</p>`:""}
     </div>
@@ -163,12 +183,12 @@ function dogCard(n){
 }
 
 function trail(bw,t){
-  const start=planStart(),n=11,W=Math.max(340,n*44),h=74,pad=18,x=i=>pad+i*((W-2*pad)/(n-1));
+  const start=planStart(),n=PLAN.length,W=Math.max(340,n*44),h=74,pad=18,x=i=>pad+i*((W-2*pad)/(n-1));
   const nowW=Math.floor((monday(t)-start)/864e5/7);let path="",dots="",lbl="";
   for(let i=0;i<n;i++){const y=i%2?38:30,xi=x(i),pk=weekTotals(i).km,f=Math.min(1,sum(bw[iso(addDays(start,i*7))]||[],"km")/pk),r=i===n-1?11:8,now=i===nowW;
     path+=(i?" L":"M")+xi.toFixed(1)+" "+y;
     dots+=`<circle cx="${xi}" cy="${y}" r="${r}" fill="var(--bg)" stroke="var(--ink)" stroke-width="${now?3:1.5}"/>`+(f>0?`<circle cx="${xi}" cy="${y}" r="${(r-2.5)*Math.sqrt(f)}" fill="var(--orange)"/>`:"");
-    if(i===n-1)dots+=`<text x="${xi}" y="${y+4}" text-anchor="middle" style="font:700 10px 'Barlow Condensed',sans-serif;fill:var(--ink)">60</text>`;
+    if(i===n-1)dots+=`<text x="${xi}" y="${y+4}" text-anchor="middle" style="font:700 10px 'Barlow Condensed',sans-serif;fill:var(--ink)">${fmtKm(S.profile.raceKm)}</text>`;
     lbl+=`<text class="lbl${now?" now":""}" x="${xi}" y="${h-4}" text-anchor="middle">${i===n-1?"Løpet":"u"+isoWeek(addDays(start,i*7))}</text>`}
   return `<div class="trail" aria-label="Løypa frem mot løpet: hver prikk er en uke, fylt etter hvor mye av ukemålet som er gjort"><svg viewBox="0 0 ${W} ${h}" width="${W}" height="${h}"><path d="${path}" fill="none" stroke="var(--line)" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>${dots}${lbl}</svg></div>`;
 }
@@ -202,19 +222,27 @@ function vLog(){
 
 function vPlan(){
   const t=todayD(),start=planStart(),done=new Set(S.sessions.map(s=>s.dato)),bw=byWeek();
-  return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">❄ = kjør på snø hvis mulig (hytta, ellers Sjusjøen). Uten snø: samme økt på barmark.</p>`+
+  return `<h2 style="margin-top:6px">Plan frem mot løpet</h2><p class="muted">Planen er laget ut fra løpet ditt: ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} hm`:""}. ❄ = kjør på snø hvis mulig. Uten snø: samme økt på barmark.</p>`+
   PLAN.map((wk,i)=>{const m=addDays(start,i*7),g=weekTotals(i),got=sum(bw[iso(m)]||[],"km");
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${got?`<span class="${got>=g.km?"hit":""}">${fmtKm(got)}</span> / `:""}${g.km} km</span></div><p class="phase">${esc(wk.f)} · ${fmtD(m)}–${fmtD(addDays(m,6))} · ${g.hm} hm</p>
-    ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=/Generalprøve|Løpet/.test(it[0]);
+    ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=it[3];
       return `<div class="${["pday",!it[1]?"rest":"",done.has(iso(dt))?"done":"",key?"key":"",iso(dt)===iso(t)?"istoday":""].join(" ")}"><span class="cond" style="font-weight:600">${DAYS[d]} <span class="muted" style="font-weight:500">${dt.getDate()}.${dt.getMonth()+1}</span></span><span class="pt">${esc(it[0])}</span><span class="muted">${it[1]?it[1]+" km":""}</span></div>`}).join("")}</section>`}).join("");
 }
 
+const dogField=(orig,name)=>`<div class="field row dogrow" style="align-items:center"><input class="dogin" data-orig="${esc(orig)}" value="${esc(name)}" maxlength="30" aria-label="Navn på hund" placeholder="Navn"><button type="button" class="btn ghost rmdog" aria-label="Fjern ${esc(name||"hund")}">Fjern</button></div>`;
 function vSettings(){
-  return `<h2 style="margin-top:6px">Hunder og løpsdato</h2>
-  <p class="muted">Endre navn på hundene, for eksempel når du vet hva lånehundene heter.</p>
-  ${S.profile.dogs.map((d,i)=>`<div class="field"><label for="dog${i}">Hund ${i+1}</label><input id="dog${i}" value="${esc(d)}" maxlength="30"></div>`).join("")}
-  <div class="field"><label for="race">Løpsdato</label><input id="race" type="date" value="${esc(S.profile.raceDate)}"></div>
-  <p class="muted small" style="margin-top:8px">Planen og ukemålene flytter seg etter løpsdatoen.</p>
+  const p=S.profile;
+  return `${S.isNew?`<p class="notice" style="margin-top:6px"><b>Velkommen!</b> Sett opp løpet du trener mot og hundene dine, så lages en plan for deg.</p>`:""}
+  <h2 style="margin-top:6px">Målet ditt</h2>
+  <p class="muted">Treningsplanen på ${TEMPLATE.length} uker lages ut fra løpet: lengden på øktene følger distansen, og høydemetrene følger stigningen.</p>
+  <div class="field"><label for="r-name">Navn på løpet</label><input id="r-name" value="${esc(p.raceName)}" maxlength="60" placeholder="F.eks. Finnskogløpet"></div>
+  <div class="field"><label for="race">Dato</label><input id="race" type="date" value="${esc(p.raceDate)}"></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="r-km">Distanse (km)</label><input id="r-km" inputmode="decimal" value="${esc(fmtKm(p.raceKm))}"></div>
+   <div><label for="r-hm">Høydemeter</label><input id="r-hm" inputmode="numeric" value="${esc(p.raceHm||"")}" placeholder="0"></div></div>
+  <h2>Hundene</h2>
+  <p class="muted">Endrer du et navn, oppdateres det i alle tidligere økter.</p>
+  <div id="dogList">${p.dogs.map(d=>dogField(d,d)).join("")}</div>
+  <div class="actions" style="margin-top:12px"><button class="btn ghost" id="addDog">+ Legg til hund</button></div>
   <div class="actions"><button class="btn" id="saveSet">Lagre</button></div><p class="err" id="setErr" hidden></p>
   <h2>Backup</h2>
   <p class="muted">Last ned alle øktene som en fil, eller hent inn økter fra en tidligere backup. Økter som allerede finnes hoppes over.</p>
@@ -316,13 +344,17 @@ function bind(){
   document.querySelectorAll(".entry").forEach(b=>b.onclick=()=>{const s=S.sessions.find(x=>x.id===b.dataset.id);if(s)openForm(s)});
   const ss=document.getElementById("saveSet");
   if(ss)ss.onclick=async()=>{
-    const old=S.profile.dogs, dogs=old.map((_,i)=>document.getElementById("dog"+i).value.trim()).map((v,i)=>v||old[i]);
+    const rows=[...document.querySelectorAll(".dogin")].map(i=>({orig:i.dataset.orig,name:i.value.trim()})).filter(r=>r.name);
+    const dogs=rows.map(r=>r.name);
     if(new Set(dogs).size!==dogs.length)return showErr("setErr",{message:"To hunder kan ikke ha samme navn."});
-    const raceDate=document.getElementById("race").value||S.profile.raceDate;
+    const raceKm=num(document.getElementById("r-km").value), raceHm=Math.round(num(document.getElementById("r-hm").value));
+    if(!(raceKm>0))return showErr("setErr",{message:"Skriv inn distansen på løpet i km."});
+    const prof={raceDate:document.getElementById("race").value||S.profile.raceDate,raceName:document.getElementById("r-name").value.trim(),raceKm,raceHm,dogs};
     ss.disabled=true;
     try{
-      ok(await sb.from("profiles").upsert({user_id:S.user.id,race_date:raceDate,dogs,updated_at:new Date().toISOString()}));
-      const ren={};old.forEach((o,i)=>{if(o!==dogs[i])ren[o]=dogs[i]});
+      ok(await sb.from("profiles").upsert({user_id:S.user.id,...profileRow(prof),updated_at:new Date().toISOString()}));
+      S.isNew=false;
+      const ren={};rows.forEach(r=>{if(r.orig&&r.orig!==r.name)ren[r.orig]=r.name});
       if(Object.keys(ren).length)for(const s of S.sessions.filter(s=>(s.hunder||[]).some(h=>h in ren))){
         const mot={};for(const [k,v] of Object.entries(s.motivasjon||{}))mot[ren[k]||k]=v;
         ok(await sb.from("okter").update({hunder:s.hunder.map(h=>ren[h]||h),motivasjon:mot}).eq("id",s.id));
@@ -330,6 +362,10 @@ function bind(){
       toast("Lagret");await refresh();
     }catch(e){showErr("setErr",e)}finally{ss.disabled=false}
   };
+  const dl=document.getElementById("dogList");
+  if(dl)dl.onclick=e=>{const b=e.target.closest(".rmdog");if(b)b.closest(".dogrow").remove()};
+  const ad=document.getElementById("addDog");
+  if(ad)ad.onclick=()=>{dl.insertAdjacentHTML("beforeend",dogField("",""));dl.lastElementChild.querySelector("input").focus()};
   const ex=document.getElementById("exportBtn");if(ex)ex.onclick=exportData;
   const im=document.getElementById("importBtn"),imf=document.getElementById("importFile");
   if(im)im.onclick=()=>imf.click();
