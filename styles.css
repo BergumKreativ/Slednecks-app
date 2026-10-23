@@ -396,3 +396,7 @@ body.tracking{overflow:hidden}
 .home .count{flex-direction:row;justify-content:center;align-items:baseline;gap:8px;font-size:2.3rem}
 .home .count small{font-size:1rem;margin:0}
 .home .race{margin-top:6px;font-size:.88rem}
+/* Sesongvalg øverst på Oversikt og i Logg */
+.seasons{display:flex;justify-content:center;gap:6px;margin:4px 0 12px;flex-wrap:wrap}
+.seasons .chip{padding:6px 12px;font-size:.88rem}
+.chip.ghost{border-style:dashed;background:transparent}

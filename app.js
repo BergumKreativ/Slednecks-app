@@ -92,6 +92,22 @@ const ACTIVE_WITH_DOG=["Canicross","Skijøring","Sykkeljøring","Gåtur","Kløvt
 const LOAD_LABEL={"Kløvtur":"Vekt i kløven (kg)","Kløvtrening":"Vekt i kløven (kg)","Kjettingtrekk":"Kjettingvekt (kg)"};
 const KROPP=[[3,"Sterk"],[2,"Ok"],[1,"Sliten"]];
 const isMe=s=>s.kategori==="meg";
+// Sesongmodus: viser bare økttyper og innhold som passer årstiden. Valget lagres på enheten.
+// Uten eget valg velges sesongen ut fra måneden (vinter des–mar, sommer jun–aug, ellers høst og vår).
+const SEASONS={
+  vinter:{label:"Vinter",dog:["Hundekjøring","Pulk","Skijøring","Gåtur","Kløvtur","Kjettingtrekk","Annet"],me:["Ski","Løping","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
+  host:{label:"Høst og vår",dog:["Sykkeljøring","Canicross","Sparkesykkel","Vogn / ATV","Gåtur","Kløvtur","Kløvtrening","Kjettingtrekk","Annet"],me:["Løping","Sykkel","Styrke","Fjelltur / gåtur","Mobilitet / yoga","Annet"]},
+  sommer:{label:"Sommer",dog:["Gåtur","Kløvtur","Kløvtrening","Canicross","Sykkeljøring","Annet"],me:["Løping","Sykkel","Fjelltur / gåtur","Svømming","Styrke","Mobilitet / yoga","Annet"]},
+};
+const autoSeason=()=>{const m=new Date().getMonth()+1;return m===12||m<=3?"vinter":m>=6&&m<=8?"sommer":"host"};
+const seasonPick=()=>{try{return localStorage.getItem("sn-season")||""}catch(e){return ""}};
+const season=()=>{const v=seasonPick()||autoSeason();return v==="alle"?null:v};
+const seasonTypes=kat=>{const k=season();return k?SEASONS[k][kat==="meg"?"me":"dog"]:(kat==="meg"?MY_TYPES:TYPES)};
+const inSeason=x=>{const k=season();return !k||SEASONS[k][isMe(x)?"me":"dog"].includes(typeOf(x.type,x.kategori))};
+function seasonBar(){
+  const cur=seasonPick()||autoSeason();
+  return `<div class="seasons" role="group" aria-label="Sesong">${[["vinter","Vinter"],["host","Høst/vår"],["sommer","Sommer"],["alle","Alt"]].map(([k,l])=>`<button type="button" class="chip" data-season="${k}" aria-pressed="${cur===k}">${l}</button>`).join("")}</div>`;
+}
 const typeOf=(t,kat)=>kat==="meg"?(MY_TYPES.includes(t)?t:"Annet"):ALIAS[t]||(TYPES.includes(t)?t:"Annet");
 const dogS=()=>S.sessions.filter(s=>!isMe(s)), meS=()=>S.sessions.filter(isMe);
 const DAYS=["man","tir","ons","tor","fre","lør","søn"];
@@ -455,6 +471,7 @@ function vHome(){
   let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&dogS().some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
   return `<div class="home">
+  ${seasonBar()}
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${upcomingRaces()}
@@ -469,8 +486,8 @@ function vHome(){
       <div><p class="lab muted">Neste langtur</p><p class="what">${next?`${DAYS[(next.d.getDay()+6)%7]} ${fmtD(next.d)}: ${esc(next.txt.replace(/^❄ /,""))}`:"–"}</p></div>
     </div>
   </section>
-  ${sh("route","Føre og løyper","trail")}
-  ${foreCard()}
+  ${season()&&season()!=="vinter"?"":`${sh("route","Føre og løyper","trail")}
+  ${foreCard()}`}
   ${sh("cloud-sun","Vær og varme","wx")}
   ${weatherCard()}
   ${sh("paw-print","Hundene","dog")}
@@ -907,9 +924,9 @@ function chart(bw){
 }
 
 function vLog(){
-  const f=S.logFilter||"alle", all=f==="hund"?dogS():f==="meg"?meS():S.sessions;
+  const f=S.logFilter||"alle", every=f==="hund"?dogS():f==="meg"?meS():S.sessions, all=every.filter(inSeason), hidden=every.length-all.length;
   const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
-  const tabs=`<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
+  const tabs=`${seasonBar()}${hidden?`<p class="small muted center" style="margin:4px 0 0">${hidden} ${hidden===1?"økt":"økter"} fra andre sesonger er skjult.</p>`:""}<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
   if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
   return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
@@ -1258,6 +1275,7 @@ function openForm(s,kat){
   F=s?JSON.parse(JSON.stringify(s)):{dato:iso(new Date()),type:typeOf(last?.type||"Sykkeljøring"),km:"",hm:"",min:"",hunder:(last?.hunder||[S.profile.dogs[0]]).filter(h=>S.profile.dogs.includes(h)),motivasjon:{},kommentar:"",kategori:kat||"hund",rpe:null,kropp:null};
   if(!s&&kat==="meg")F.type=(meS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Løping";
   F.kategori=F.kategori||"hund";F.type=typeOf(F.type,F.kategori);
+  if(!s){const sea=seasonTypes(F.kategori);if(!sea.includes(F.type))F.type=sea[0]}
   if(!s){const w=wxNow();if(w){F.temp=fmtKm(w.temp);F.rh=Math.round(w.rh)}}F.motivasjon=F.motivasjon||{};F.hunder=F.hunder||[];
   if(!F.min)F.min="";if(!F.hm)F.hm="";
   sheet.classList.add("open");draw();
@@ -1275,7 +1293,8 @@ function draw(){
   <div class="field"><span class="flabel">Bilder</span><div class="thumbs">${(F.bilder||[]).map(p=>`<span class="thumb">${imgTag(p,"","Bilde fra økta")}<button type="button" data-rmimg="${esc(p)}" aria-label="Fjern bilde">×</button></span>`).join("")}
    <button type="button" class="thumb addimg" id="imgBtn" aria-label="Legg til bilder">+</button></div><input type="file" id="imgFile" accept="image/*" multiple hidden></div>
   <div class="field"><label for="f-dato">Dato</label><input id="f-dato" type="date" value="${esc(F.dato)}"></div>
-  <div class="field"><span class="flabel">Type økt</span><div class="chips">${(me?MY_TYPES:TYPES).map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")}</div></div>
+  <div class="field"><span class="flabel">Type økt</span><div class="chips">${(()=>{const all=me?MY_TYPES:TYPES,sea=seasonTypes(me?"meg":"hund"),list=F._allTypes?all:all.filter(t=>sea.includes(t)||t===F.type);
+    return list.map(t=>`<button type="button" class="chip" data-type="${t}" aria-pressed="${F.type===t}">${t}</button>`).join("")+(list.length<all.length?`<button type="button" class="chip ghost" id="f-moretypes">Flere typer …</button>`:"")})()}</div></div>
   <div class="field grid3"><div><label for="f-km">Km</label><input id="f-km" inputmode="decimal" value="${esc(F.km)}" placeholder="0"></div>
    <div><label for="f-hm">Høydemeter</label><input id="f-hm" inputmode="numeric" value="${esc(F.hm)}" placeholder="0"></div>
    <div><label for="f-min">Minutter</label><input id="f-min" inputmode="numeric" value="${esc(F.min)}" placeholder="0"></div></div>
@@ -1305,10 +1324,11 @@ function draw(){
   gf.onchange=async()=>{const f=gf.files[0];if(!f)return;keep();try{await loadGpx(f);draw();toast("Turen er hentet fra fila")}catch(e){showErr("gpxErr",e)}};
   const gr=panel.querySelector("#gpxRemove");if(gr)gr.onclick=()=>{keep();F.rute=null;F.kilde="";draw()};
   panel.querySelector("#f-dato").onchange=()=>{keep();draw()};
-  panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");draw()});
+  panel.querySelectorAll("[data-kat]").forEach(b=>b.onclick=()=>{keep();if(F.kategori===b.dataset.kat)return;F.kategori=b.dataset.kat;F.type=F.kategori==="meg"?"Løping":typeOf((dogS().slice().sort((a,b)=>a.dato<b.dato?1:-1)[0]||{}).type||"Sykkeljøring");{const sea=seasonTypes(F.kategori);if(!sea.includes(F.type))F.type=sea[0]}draw()});
   panel.querySelectorAll("[data-rpe]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.rpe);F.rpe=F.rpe===v?null:v;draw()});
   panel.querySelectorAll("[data-kropp]").forEach(b=>b.onclick=()=>{keep();const v=Number(b.dataset.kropp);F.kropp=F.kropp===v?null:v;draw()});
   panel.querySelectorAll("[data-type]").forEach(b=>b.onclick=()=>{keep();F.type=b.dataset.type;draw()});
+  const mt=panel.querySelector("#f-moretypes");if(mt)mt.onclick=()=>{keep();F._allTypes=true;draw()};
   panel.querySelectorAll("[data-dog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.dog;if(F.hunder.includes(d)){F.hunder=F.hunder.filter(x=>x!==d);delete F.motivasjon[d]}else F.hunder=[...F.hunder,d];draw()});
   panel.querySelectorAll("[data-mdog]").forEach(b=>b.onclick=()=>{keep();const d=b.dataset.mdog,v=Number(b.dataset.m);if(F.motivasjon[d]===v)delete F.motivasjon[d];else F.motivasjon[d]=v;draw()});
   panel.querySelector("#fSave").onclick=async()=>{keep();await save()};
@@ -1452,6 +1472,7 @@ function bind(){
   document.querySelectorAll("[data-goal]").forEach(b=>b.onclick=()=>openGoal((S.profile.myGoals||[]).find(g=>g.id===b.dataset.goal)));
   const am=document.getElementById("addMe");if(am)am.onclick=()=>openForm(null,"meg");
   document.querySelectorAll("[data-logf]").forEach(b=>b.onclick=()=>{S.logFilter=b.dataset.logf;render()});
+  document.querySelectorAll("[data-season]").forEach(b=>b.onclick=()=>{const k=b.dataset.season;try{k===autoSeason()?localStorage.removeItem("sn-season"):localStorage.setItem("sn-season",k)}catch(e){}render()});
   document.querySelectorAll("[data-dogpage]").forEach(b=>b.onclick=()=>{S.dog=b.dataset.dogpage;S.view="hund";render();window.scrollTo(0,0)});
   if(S.view==="hund"&&S.user)bindDog();
   const send=document.getElementById("l-send");
