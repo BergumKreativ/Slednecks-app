@@ -262,7 +262,9 @@ function vLogin(){
     <div class="field"><label for="s-code">Invitasjonskode</label><input id="s-code" autocomplete="off" autocapitalize="characters" value="${esc(S.invite)}" placeholder="SAGA-XXXX"></div>
     <div class="actions"><button class="btn" id="s-go">Lag konto</button></div>
     <p class="small" style="margin-top:12px"><button type="button" class="linkbtn" id="s-back">Har du konto? Logg inn</button></p>`
-  :S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
+  :S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Skriv inn koden fra e-posten her. Lenken i e-posten virker også, men bare i nettleseren den åpnes i, ikke i appen på hjem-skjermen.</p>
+    <div class="field" style="margin-top:12px"><label for="l-code">Kode fra e-posten</label><input id="l-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456"></div>
+    <div class="actions"><button class="btn" id="l-codego">Logg inn med kode</button></div>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
     ${S.pwMode?`<div class="field"><label for="l-pw">Passord</label><input id="l-pw" type="password" autocomplete="current-password"></div>
@@ -1838,6 +1840,15 @@ function bind(){
     if(r.error){pwgo.disabled=false;showErr("lErr",/invalid/i.test(r.error.message||"")?{message:"Feil e-post eller passord."}:r.error)}
   };
   const back=document.getElementById("l-back");if(back)back.onclick=()=>{S.loginSent=false;render()};
+  // Engangskode fra e-posten: virker også i appen på hjem-skjermen, som har egen lagring atskilt fra Safari
+  const cgo=document.getElementById("l-codego");
+  if(cgo)cgo.onclick=async()=>{
+    const token=document.getElementById("l-code").value.replace(/\s/g,"");
+    if(!/^\d{6,10}$/.test(token))return showErr("lErr",{message:"Skriv inn koden fra e-posten."});
+    cgo.disabled=true;
+    const r=await sb.auth.verifyOtp({email:S.loginEmail,token,type:"email"});
+    if(r.error){cgo.disabled=false;showErr("lErr",/expired|invalid/i.test(r.error.message||"")?{message:"Koden er feil eller har gått ut. Be om en ny."}:r.error)}
+  };
   const lsu=document.getElementById("l-signup");if(lsu)lsu.onclick=()=>{const e=document.getElementById("l-email");if(e)S.loginEmail=e.value.trim();S.signup=true;render()};
   const sba=document.getElementById("s-back");if(sba)sba.onclick=()=>{S.loginEmail=document.getElementById("s-email").value.trim();S.signup=false;S.pwMode=true;render()};
   const sgo=document.getElementById("s-go");
