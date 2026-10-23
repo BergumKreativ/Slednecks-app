@@ -148,7 +148,16 @@ async function loadAll(){
     S.isNew=true;S.view="velkommen";
   }
   S.sessions=ok(o).map(rowToSession);
-  S.loaded=true;render();
+  const first=!S.loaded;S.loaded=true;render();
+  if(first){const t=trkLoad();if(t&&!t.done&&trkWatch==null)openTrack()}
+}
+// Demo: viser sporingsskjermen midt i en tur, uten å bruke GPS
+function demoTrack(){
+  const r=(S.sessions.find(s=>s.rute)||{}).rute||[[61.121,10.468,640],[61.124,10.474,652],[61.128,10.479,661],[61.131,10.487,675],[61.129,10.495,690],[61.125,10.499,704]];
+  const t0=Date.now()-47*60000;let m=0;for(let i=1;i<r.length;i++)m+=trkDist(r[i-1],r[i]);
+  TRK={start:t0,pausedMs:0,pausedAt:0,pts:r.map((p,i)=>[p[0],p[1],p[2],t0+i*60000]),m,gain:58,eleRef:null,acc:6,err:"",seg:false};
+  const geo=navigator.geolocation;try{Object.defineProperty(navigator,"geolocation",{value:{watchPosition:()=>0,clearWatch:()=>{}},configurable:true})}catch(e){}
+  openTrack();try{Object.defineProperty(navigator,"geolocation",{value:geo,configurable:true})}catch(e){}
 }
 function demoScreen(){
   const k=DEMO_SCREEN;
@@ -158,7 +167,7 @@ function demoScreen(){
   render();
   const open={"ny-okt":()=>openForm(),"ny-okt-meg":()=>openForm(null,"meg"),"endre-okt":()=>openForm(S.sessions[0]),
     "tractive":openTractive,"mal":()=>openGoal(),"tilbakemelding":openFeedback,"dag":()=>openDay(iso(addDays(planStart(),15))),
-    "foremelding":()=>openReport(61.12,10.47)}[k];
+    "foremelding":()=>openReport(61.12,10.47),"sporing":demoTrack}[k];
   if(open)open();
 }
 const profileRow=p=>({lisens:p.lisens||"",race_date:p.raceDate,race_name:p.raceName,race_km:p.raceKm,race_hm:p.raceHm,race_id:p.raceId,race_type:p.raceType,plan_type:p.planType,dogs:p.dogs});
@@ -412,6 +421,11 @@ function loadImgs(){
 const imgTag=(path,cls,alt)=>`<img class="${cls}" data-path="${esc(path)}" alt="${esc(alt||"")}">`;
 const allImagePaths=()=>[...S.sessions.flatMap(s=>s.bilder||[]),...Object.values(S.profile.dogInfo||{}).map(i=>i.photo),S.profile.cover].filter(Boolean);
 
+function trackCard(){
+  const t=trkLoad();
+  if(t&&t.done)return `<p class="notice center" style="margin-top:12px">${icon("route","sm")} Du har en sporet tur på ${fmtKm(t.m/1000)} km som ikke er lagret.</p><div class="actions" style="margin-top:8px"><button type="button" class="btn" id="trackSave">Lagre turen</button><button type="button" class="btn line" id="trackDiscard">Slett</button></div>`;
+  return `<div class="actions" style="margin-top:14px"><button type="button" class="btn" id="trackStart">${icon(t?"route":"play","sm")} ${t?"Fortsett turen":"Start tur med GPS"}</button></div>`;
+}
 function vHome(){
   const t=todayD(), race=parse(S.profile.raceDate), days=Math.round((race-t)/864e5);
   const bw=byWeek(), mon=monday(t), wk=bw[iso(mon)]||[], idx=planWeekIdx(t), pd=planDay(t);
@@ -430,6 +444,7 @@ function vHome(){
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
   ${progressCard(t)}
+  ${trackCard()}
   ${trail(bw,t)}
   <section class="week">
     <div class="row"><h3>Ukemål uke ${isoWeek(t)}</h3><span class="small muted">${idx>=0?esc(PLAN[idx].f):""}</span></div>
@@ -880,8 +895,8 @@ function vLog(){
   const f=S.logFilter||"alle", all=f==="hund"?dogS():f==="meg"?meS():S.sessions;
   const bw=byWeek(all), keys=Object.keys(bw).sort().reverse();
   const tabs=`<div class="chips" style="margin:6px 0 4px">${[["alle","Alle"],["hund","Med hunder"],["meg","Bare meg"]].map(([v,l])=>`<button type="button" class="chip" data-logf="${v}" aria-pressed="${f===v}">${l}</button>`).join("")}</div>`;
-  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
-  return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
+  if(!keys.length)return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="empty">${S.loaded?"Ingen økter her ennå. Trykk + for å føre den første.":"Henter økter …"}</p>`;
+  return `${sh("list","Logg","plan","margin-top:6px")}<div class="actions" style="margin:-4px 0 6px"><button type="button" class="btn ghost sm" id="trackStart2">${icon("play","sm")} Spor tur med GPS</button><button type="button" class="btn ghost sm" id="trImport">${icon("route","sm")} Importer turer fra Tractive</button></div>${tabs}<p class="muted">${all.length} økter · ${fmtKm(sum(all,"km"))} km · ${fmtMin(sum(all,"min"))}</p>`+
   keys.map(k=>{const list=bw[k].slice().sort((a,b)=>a.dato<b.dato?1:-1),m=parse(k),i=planWeekIdx(m),dl=list.filter(x=>!isMe(x)),ml=list.filter(isMe),km=sum(dl,"km"),goal=i>=0?weekTotals(i).km:0;
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${dl.length?(goal?`<span class="${km>=goal?"hit":""}">${fmtKm(km)}</span> / ${goal} km`:`${fmtKm(km)} km`):""}${dl.length&&ml.length?" · ":""}${ml.length?`deg: ${ml.length} ${ml.length===1?"økt":"økter"}`:""}</span></div>
     ${list.map(s=>{const d=parse(s.dato),me=isMe(s);return `<button class="entry${me?" me":""}" data-id="${esc(s.id)}"><span class="d">${DAYS[(d.getDay()+6)%7]}<small>${fmtD(d)}</small></span>
@@ -1018,15 +1033,119 @@ function drawRoute(el,route){
 }
 async function loadGpx(file){
   const g=GPX.parse(await file.text());
+  applyRoute(g,"gpx");
+  return g;
+}
+function applyRoute(g,kilde){
   if(g.start)F.dato=iso(g.start);
   F.km=String(Math.round(g.km*100)/100).replace(".",",");
   if(g.hm)F.hm=String(g.hm);
   if(g.min)F.min=String(g.min);
-  F.rute=g.route;F.kilde="gpx";
+  F.rute=g.route;F.kilde=kilde;
   if(!F.kommentar&&g.name)F.kommentar=g.name;
   if(g.start&&iso(g.start)!==iso(new Date())){F.temp="";F.rh=""}
-  return g;
 }
+/* GPS-sporing i appen. Virker mens appen er åpen, og skjermen holdes på. Låses skjermen, stopper nettleseren
+   GPS-en til appen åpnes igjen, og strekningen imellom regnes som en rett linje. Turen lagres underveis på
+   telefonen, så den ikke forsvinner hvis appen lastes på nytt. */
+const TRK_KEY="sn-track";
+let TRK=null,trkWatch=null,trkTimer=null,trkLock=null,trkMap=null,trkLine=null,trkDot=null;
+const trkLoad=()=>{if(DEMO)return null;try{return JSON.parse(localStorage.getItem(TRK_KEY)||"null")}catch(e){return null}};
+const trkStore=()=>{if(DEMO)return;try{TRK?localStorage.setItem(TRK_KEY,JSON.stringify(TRK)):localStorage.removeItem(TRK_KEY)}catch(e){}};
+const trkDist=(a,b)=>{const r=Math.PI/180,h=Math.sin((b[0]-a[0])*r/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin((b[1]-a[1])*r/2)**2;return 12742000*Math.asin(Math.sqrt(h))};
+const trkMs=()=>TRK?Math.max(0,(TRK.pausedAt||Date.now())-TRK.start-TRK.pausedMs):0;
+const hms=ms=>{const s=Math.floor(ms/1000);return `${Math.floor(s/3600)}:${String(Math.floor(s/60)%60).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};
+async function trkWake(){try{if("wakeLock" in navigator&&!document.hidden&&!trkLock){trkLock=await navigator.wakeLock.request("screen");trkLock.addEventListener("release",()=>{trkLock=null})}}catch(e){}}
+function openTrack(){
+  if(!navigator.geolocation)return toast("Denne nettleseren kan ikke bruke GPS.");
+  if(!TRK||TRK.done)TRK=trkLoad();
+  if(!TRK||TRK.done)TRK={start:Date.now(),pausedMs:0,pausedAt:0,pts:[],m:0,gain:0,eleRef:null,acc:null,err:"",seg:false};
+  trkStore();
+  let el=document.getElementById("trackView");
+  if(!el){el=document.createElement("div");el.id="trackView";el.className="trackview";document.body.appendChild(el)}
+  el.innerHTML=`<div id="tkMap" class="tkmap"></div>
+   <div class="tkpanel">
+    <p class="tkstat" id="tkStat"></p>
+    <div class="tknums"><div><b id="tkTime">0:00:00</b><span>tid</span></div><div><b id="tkKm">0</b><span>km</span></div><div><b id="tkSpd">0</b><span>km/t i snitt</span></div><div><b id="tkHm">0</b><span>høydemeter</span></div></div>
+    <div class="actions"><button type="button" class="btn line" id="tkPause"></button><button type="button" class="btn" id="tkStop">${icon("square","sm")} Avslutt</button></div>
+    <p class="small muted center" style="margin:12px 0 0">Ha appen åpen under turen, så holdes skjermen på. Låser du skjermen, stopper sporingen til du åpner appen igjen.</p>
+   </div>`;
+  document.body.classList.add("tracking");
+  if(window.L){
+    trkMap=L.map("tkMap",{zoomControl:false,attributionControl:true});
+    L.tileLayer(KARTVERKET,{maxZoom:18,attribution:'© <a href="https://www.kartverket.no/" target="_blank" rel="noopener">Kartverket</a>'}).addTo(trkMap);
+    const color=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#D7263D";
+    trkLine=L.polyline(TRK.pts.map(p=>[p[0],p[1]]),{color,weight:5,opacity:.9}).addTo(trkMap);
+    const last=TRK.pts[TRK.pts.length-1];
+    trkMap.setView(last?[last[0],last[1]]:[61.5,9.5],last?16:5);
+    setTimeout(()=>trkMap&&trkMap.invalidateSize(),60);
+  }
+  document.getElementById("tkPause").onclick=()=>{
+    if(TRK.pausedAt){TRK.pausedMs+=Date.now()-TRK.pausedAt;TRK.pausedAt=0;TRK.seg=true}else TRK.pausedAt=Date.now();
+    trkStore();trkDraw();
+  };
+  document.getElementById("tkStop").onclick=()=>{if(confirm("Avslutte turen?"))finishTrack()};
+  trkWatch=navigator.geolocation.watchPosition(trkPos,e=>{TRK.err=e.code===1?"Appen får ikke bruke posisjonen din. Tillat posisjon for nettstedet i innstillingene på telefonen, og prøv igjen.":"Finner ikke posisjonen. Gå gjerne ut i åpent lende.";trkDraw()},{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+  trkTimer=setInterval(trkDraw,1000);
+  trkWake();trkDraw();
+}
+function trkPos(p){
+  const c=p.coords;TRK.acc=c.accuracy;TRK.err="";
+  const pt=[+c.latitude.toFixed(6),+c.longitude.toFixed(6),c.altitude!=null?Math.round(c.altitude*10)/10:null,p.timestamp||Date.now()];
+  if(trkMap){if(!trkDot)trkDot=L.circleMarker([pt[0],pt[1]],{radius:7,color:"#fff",weight:3,fillColor:"#1E6FD9",fillOpacity:1}).addTo(trkMap);else trkDot.setLatLng([pt[0],pt[1]]);
+    if(TRK.pts.length?trkMap.getZoom()<13:true)trkMap.setView([pt[0],pt[1]],16);else trkMap.panTo([pt[0],pt[1]])}
+  if(TRK.pausedAt||c.accuracy>40)return trkDraw();
+  const last=TRK.pts[TRK.pts.length-1];
+  if(last){
+    const d=trkDist(last,pt);
+    if(d<Math.max(5,c.accuracy*.5))return trkDraw();
+    if(!TRK.seg)TRK.m+=d;
+  }
+  TRK.seg=false;
+  if(pt[2]!=null){if(TRK.eleRef==null)TRK.eleRef=pt[2];else if(pt[2]-TRK.eleRef>=4){TRK.gain+=pt[2]-TRK.eleRef;TRK.eleRef=pt[2]}else if(TRK.eleRef-pt[2]>=4)TRK.eleRef=pt[2]}
+  TRK.pts.push(pt);trkStore();
+  if(trkLine)trkLine.addLatLng([pt[0],pt[1]]);
+  trkDraw();
+}
+function trkDraw(){
+  if(!TRK)return;
+  const $=id=>document.getElementById(id),ms=trkMs(),km=TRK.m/1000;
+  if(!$("tkTime"))return;
+  $("tkTime").textContent=hms(ms);
+  $("tkKm").textContent=km.toLocaleString("nb-NO",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("tkSpd").textContent=fmtKm(ms>60000?km/(ms/36e5):0);
+  $("tkHm").textContent=Math.round(TRK.gain);
+  $("tkPause").innerHTML=TRK.pausedAt?`${icon("play","sm")} Fortsett`:`${icon("pause","sm")} Pause`;
+  const st=TRK.err?["bad",TRK.err]:TRK.pausedAt?["warn","Pause. Tid og km står stille."]:TRK.acc==null?["warn","Venter på GPS …"]:TRK.acc>40?["warn",`Svakt GPS-signal (±${Math.round(TRK.acc)} m)`]:["good",`Sporer · GPS ±${Math.round(TRK.acc)} m`];
+  $("tkStat").className="tkstat "+st[0];$("tkStat").textContent=st[1];
+}
+function stopTrackView(){
+  if(trkWatch!=null)navigator.geolocation.clearWatch(trkWatch);
+  clearInterval(trkTimer);trkWatch=null;trkTimer=null;
+  if(trkLock){trkLock.release().catch(()=>{});trkLock=null}
+  if(trkMap){trkMap.remove();trkMap=null;trkLine=null;trkDot=null}
+  const el=document.getElementById("trackView");if(el)el.remove();
+  document.body.classList.remove("tracking");
+}
+function finishTrack(){
+  if(TRK.pausedAt){TRK.pausedMs+=Date.now()-TRK.pausedAt;TRK.pausedAt=0}
+  TRK.done=true;TRK.end=Date.now();trkStore();stopTrackView();
+  if(TRK.pts.length<2||TRK.m<50){TRK=null;trkStore();render();return toast("Turen var for kort til å lagres.")}
+  saveTrack();
+}
+// Åpner skjemaet for ny økt med turen fylt inn. Turen ligger på telefonen til økta er lagret.
+function saveTrack(){
+  TRK=TRK||trkLoad();if(!TRK)return;
+  const gpx=`<gpx><trk><trkseg>${TRK.pts.map(p=>`<trkpt lat="${p[0]}" lon="${p[1]}">${p[2]!=null?`<ele>${p[2]}</ele>`:""}<time>${new Date(p[3]).toISOString()}</time></trkpt>`).join("")}</trkseg></trk></gpx>`;
+  openForm();
+  applyRoute(GPX.parse(gpx),"gps");
+  F.dato=iso(new Date(TRK.start));
+  F.km=String(Math.round(TRK.m/10)/100).replace(".",",");
+  F.min=String(Math.max(1,Math.round(((TRK.end||Date.now())-TRK.start-TRK.pausedMs)/60000)));
+  F._track=true;
+  draw();
+}
+function discardTrack(){if(!confirm("Slette turen uten å lagre den?"))return;TRK=null;trkStore();render()}
 /* Tractive-import: posisjonshistorikk (GPX/KML fra my.tractive.com) deles i turer, og brukeren velger hvilke som blir økter */
 const guessType=kmh=>kmh>=13?"Sykkeljøring":kmh>=7?"Canicross":"Gåtur";
 function openTractive(){
@@ -1168,6 +1287,7 @@ async function save(){
   try{
     ok(editing?await sb.from("okter").update(body).eq("id",editing.id):await sb.from("okter").insert(body));
     const gone=F._gone||[];F._new=[];F._gone=[];removeImages(gone).catch(()=>{});
+    if(F._track){TRK=null;trkStore()}
     const was=editing;closeForm();toast(was?"Endringene er lagret":"Økta er lagret");await refresh();
   }catch(e){btn.disabled=false;showErr("fErr",e)}
 }
@@ -1240,6 +1360,9 @@ async function importData(file){
 function bind(){
   const pws=document.getElementById("pwSave");if(pws)pws.onclick=async()=>{const v=document.getElementById("newpw").value;if(v.length<8)return toast("Passordet må ha minst 8 tegn");const r=await sb.auth.updateUser({password:v});if(r.error)toast(errText(r.error));else{document.getElementById("newpw").value="";toast("Passordet er lagret")}};
   const tri=document.getElementById("trImport");if(tri)tri.onclick=openTractive;
+  ["trackStart","trackStart2"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openTrack});
+  const tsv=document.getElementById("trackSave");if(tsv)tsv.onclick=saveTrack;
+  const tds=document.getElementById("trackDiscard");if(tds)tds.onclick=discardTrack;
   const ns=document.getElementById("nickSave");if(ns)ns.onclick=async()=>{const v=document.getElementById("nick").value.trim();try{ok(await sb.from("profiles").update({nickname:v}).eq("user_id",S.user.id));S.profile.nickname=v;toast("Lagret")}catch(e){toast(errText(e))}};
   if(S.view==="kart"&&S.user){if(!REP.at)loadReports();bindMap()}
   loadImgs();
@@ -1383,7 +1506,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{S.view=t.dataset.v;t
 document.getElementById("addBtn").onclick=()=>openForm();
 sheet.addEventListener("click",e=>{if(e.target===sheet)closeForm()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeForm()});
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.user)refresh();if(!document.hidden&&trkWatch!=null)trkWake()});
 
 // Startskjerm: skjules når innloggingsstatus er kjent, men vises minst 2,5 s så animasjonen rekker å bli ferdig
 const SPLASH_T0=Date.now();

@@ -379,3 +379,20 @@ body.anon .login .err::before{background:#fff}
 
 .trrow{cursor:pointer;gap:10px}
 .trrow.sel{background:var(--soft);border-radius:12px}
+/* GPS-sporing */
+.trackview{position:fixed;inset:0;z-index:28;background:var(--bg);display:flex;flex-direction:column}
+body.tracking{overflow:hidden}
+.tkmap{flex:1;min-height:180px;background:var(--soft)}
+.tkpanel{padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px));background:var(--card);box-shadow:0 -8px 24px rgba(0,0,0,.10);border-radius:22px 22px 0 0;margin-top:-18px;position:relative;z-index:500}
+.tknums{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;text-align:center;margin:10px 0 4px}
+.tknums b{display:block;font-size:2.5rem;font-weight:250;line-height:1.05;font-variant-numeric:tabular-nums}
+.tknums span{font-size:.8rem;color:var(--muted)}
+.tkstat{display:flex;align-items:center;justify-content:center;gap:8px;margin:0;font-size:.88rem}
+.tkstat::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.tkstat.good::before{background:var(--good)}.tkstat.warn::before{background:var(--warn)}.tkstat.bad::before{background:var(--bad)}
+.tkpanel .actions{margin-top:12px}
+/* Kompakt nedtelling på Oversikt, så progresjonen kommer høyere opp */
+.home .hero{padding:12px 16px;border-radius:18px}
+.home .count{flex-direction:row;justify-content:center;align-items:baseline;gap:8px;font-size:2.3rem}
+.home .count small{font-size:1rem;margin:0}
+.home .race{margin-top:6px;font-size:.88rem}
