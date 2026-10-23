@@ -131,6 +131,10 @@ textarea{min-height:76px;resize:vertical}
 .login .brand{font-size:3rem;font-weight:700;line-height:.95}
 .login .brand span{color:var(--accent)}
 body.anon .tabs{display:none}
+.login{text-align:center}
+.login .field label{text-align:center}
+.login input{text-align:center}
+.login .actions{justify-content:center}
 body.anon main{padding-bottom:40px}
 
 /* Regler og kalkulator */
@@ -192,6 +196,25 @@ body.anon main{padding-bottom:40px}
 .lbar b{text-align:right}
 .lbar .bar{background:var(--soft);height:10px;margin:0}
 .lbar .bar span.mid{background:var(--warn)}.lbar .bar span.hi{background:var(--bad)}.lbar .bar span.base{background:var(--muted)}
+
+/* Midtstilt oversikt */
+.home .hero{text-align:center}
+.home .count{display:flex;flex-direction:column;align-items:center}
+.home .count small{margin:4px 0 0}
+.home h2{text-align:center}
+.home .row.center{flex-direction:column;align-items:center;gap:8px}
+.home .notice{text-align:center}
+.home .actions{justify-content:center}
+.home .actions .btn{flex:0 1 auto;min-width:220px}
+.home .wx{text-align:center}
+.home .wx>.row{justify-content:center;gap:10px;flex-wrap:wrap}
+.home .wxnow{justify-content:center;text-align:left}
+.home .wx ul{display:inline-block;text-align:left}
+.home .week{text-align:center}
+.home .week>.row{flex-direction:column;align-items:center;gap:2px;text-align:center}
+.home .next{text-align:center}
+.home .legend{justify-content:center}
+.home .goal .row{flex-direction:row}
 
 /* Meny */
 .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom,0px)}

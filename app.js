@@ -152,7 +152,7 @@ function vSetup(){
 }
 
 function vLogin(){
-  return `<section class="login"><h1 class="brand cond">Slednecks<span>.</span></h1><p class="muted" style="margin-top:6px">Treningslogg for hundene</p>
+  return `<section class="login"><h1 class="brand cond">Slednecks<span>.</span></h1><p class="muted" style="margin-top:6px">Treningslogg for deg og hunden</p>
   ${S.loginSent?`<p class="notice">Vi har sendt en e-post til <b>${esc(S.loginEmail)}</b>. Åpne den på denne enheten og trykk på lenken for å logge inn.</p>
     <p style="margin-top:14px"><button class="btn ghost" id="l-back">Bruk en annen e-post</button></p>`
   :`<div class="field"><label for="l-email">E-post</label><input id="l-email" type="email" autocomplete="email" value="${esc(S.loginEmail)}" placeholder="navn@eksempel.no"></div>
@@ -181,8 +181,8 @@ function vHome(){
   }
   let next=null;for(let i=0;i<77&&!next;i++){const d=addDays(t,i),p=planDay(d);if(p&&p.item[1]>=25&&!(i===0&&dogS().some(s=>s.dato===iso(d))))next={d,txt:p.item[0]}}
   const todayDone=S.sessions.some(s=>s.dato===iso(t));
-  return `
-  <section>${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
+  return `<div class="home">
+  <section class="hero">${hero}<p class="race">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p></section>
   ${progressCard(t)}
   ${trail(bw,t)}
   <section class="week">
@@ -197,10 +197,10 @@ function vHome(){
   ${weatherCard()}
   <h2>Hundene</h2>
   ${S.profile.dogs.length?`<div class="dogs">${S.profile.dogs.map(dogCard).join("")}</div>`:`<p class="notice">Legg til hundene dine under Profil.</p>`}
-  <div class="row" style="margin-top:28px"><h2 style="margin:0">Deg</h2><button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
+  <div class="row center" style="margin-top:28px"><h2 style="margin:0">Deg</h2><button class="btn ghost sm" id="addMe">+ Egen økt</button></div>
   ${meCard(t)}
   <h2>Uke for uke</h2>
-  ${chart(bw)}`;
+  ${chart(bw)}</div>`;
 }
 
 /* Vær fra MET Norway (yr). Posisjonen hentes fra nettleseren og huskes på denne enheten. */
@@ -239,7 +239,7 @@ const RISK=[
 ];
 const HEAT_SIGNS="Tegn på overoppheting: kraftig pesing, bred og mørk tunge, sikling, vingling eller at hunden vil stoppe. Stopp, finn skygge og kjøl ned med vann (ikke iskaldt). Kontakt veterinær ved tvil.";
 function weatherCard(){
-  if(!savedPos())return `<div class="wx"><p><b>Vær og varme</b></p><p class="small muted">Se temperatur, luftfuktighet og varmerisiko for hundene der du er, og når det er best å trene.</p>
+  if(!savedPos())return `<div class="wx"><p class="small muted">Se temperatur, luftfuktighet og varmerisiko for hundene der du er, og når det er best å trene.</p>
     ${W.err==="denied"?`<p class="small err">Fikk ikke tilgang til posisjonen. Slå på stedstjenester for nettleseren og prøv igjen.</p>`:""}
     <div class="actions"><button class="btn line" id="wxPos">Vis vær der jeg er</button></div></div>`;
   if(!W.data)return `<div class="wx"><p class="small muted">${W.err?"Fikk ikke hentet været. Prøv igjen senere.":"Henter vær …"}</p>${W.err?`<div class="actions"><button class="btn ghost sm" id="wxRetry">Prøv igjen</button></div>`:""}</div>`;
@@ -327,7 +327,7 @@ function goalPlan(g){
 function goalsHtml(){
   const gs=S.profile.myGoals||[];
   const bar=(label,v,goal,unit)=>{const pct=Math.min(100,v/goal*100);return `<div class="gbar"><div class="row small"><span>${label}</span><span class="muted">${fmtKm(v)} / ${fmtKm(goal)} ${unit}</span></div><div class="bar"><span style="width:${pct}%"></span></div></div>`};
-  return `<div class="row" style="margin-top:18px"><h3>Mine mål</h3><button class="btn ghost sm" id="addGoal">+ Nytt mål</button></div>
+  return `<div class="row center" style="margin-top:18px"><h3>Mine mål</h3><button class="btn ghost sm" id="addGoal">+ Nytt mål</button></div>
   ${gs.length?gs.map(g=>{const p=goalProgress(g),days=g.date?Math.round((parse(g.date)-todayD())/864e5):null;
     return `<button type="button" class="goal" data-goal="${esc(g.id)}"><div class="row"><b>${esc(g.name)}</b><span class="small ${p.done?"badge-ok":"muted"}">${p.done?"Nådd ✓":days!=null?(days>=0?`om ${days} dager`:"datoen er passert"):""}</span></div>
      <p class="small muted">${esc(g.type||"Alle typer")}${g.date?` · ${parse(g.date).toLocaleDateString("nb-NO",{day:"numeric",month:"long",year:"numeric"})}`:""}</p>
