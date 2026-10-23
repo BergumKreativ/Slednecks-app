@@ -92,7 +92,8 @@ button{font:inherit;color:inherit}
 .empty{padding:28px 4px;color:var(--muted)}
 
 /* Plan */
-.pday{display:grid;grid-template-columns:62px 1fr auto;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);align-items:baseline}
+.pday{display:grid;grid-template-columns:62px 1fr auto;gap:10px;padding:9px 2px;border:0;border-bottom:1px solid var(--line);align-items:baseline;width:100%;background:none;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.pday.own .pt::before{content:"✎ ";color:var(--orange)}
 .pday.rest{color:var(--muted)}
 .pday.done .pt::after{content:" ✓";color:var(--orange);font-weight:700}
 .pday.key{background:var(--orange-soft);border-radius:8px;padding-left:8px;padding-right:8px}

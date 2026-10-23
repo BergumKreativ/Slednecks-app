@@ -28,4 +28,4 @@ Legg mappa i et GitHub-repo, og slå på Settings → Pages → *Deploy from a b
 
 Registrering er stengt (Supabase → Authentication → Sign In / Providers → *Allow new users to sign up* er av). Nye brukere legges til under Authentication → Users → *Add user* → *Send invitation*. Hver bruker har sin egen logg.
 
-Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hunder under **Profil**. Treningsplanen på 11 uker skaleres fra malen i `app.js` (TEMPLATE, laget for 60 km / 1500 hm).
+Hver bruker setter sitt eget løp (navn, dato, distanse, høydemeter) og sine hunder under **Profil**. Løp kan velges fra kalenderen i [races.js](races.js) (hentet fra liverace.app og sleddog.no – oppdater før hver sesong). Treningsplanen på 11 uker velges etter distanse (sprint < 25 km, langdistanse > 100 km, ellers mellomdistanse; malene ligger i `TEMPLATES` i `app.js`) og skaleres etter løpet. Hver dag i planen kan endres under Plan; endringene lagres i `plan_custom`.
