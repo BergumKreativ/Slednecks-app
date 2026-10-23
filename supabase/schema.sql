@@ -130,3 +130,6 @@ create policy "egen profil" on public.profiles
 drop policy if exists "egne økter" on public.okter;
 create policy "egne økter" on public.okter
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Flere løp i sesongen: [{ id, raceId, name, date, km, hm }]. Hovedløpet ligger i race_*-kolonnene.
+alter table public.profiles add column if not exists races jsonb not null default '[]'::jsonb;

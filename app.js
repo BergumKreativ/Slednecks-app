@@ -140,9 +140,9 @@ async function loadAll(){
     if(first)demoScreen();else render();
     return;
   }
-  const [p,o]=await Promise.all([sb.from("profiles").select("race_date,race_name,race_km,race_hm,race_id,race_type,plan_type,plan_custom,dog_info,my_goals,cover,nickname,lisens,dogs").maybeSingle(),sb.from("okter").select("*").order("dato")]);
+  const [p,o]=await Promise.all([sb.from("profiles").select("*").maybeSingle(),sb.from("okter").select("*").order("dato")]);
   const prof=ok(p);
-  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
+  if(prof)S.profile={raceDate:prof.race_date||S.profile.raceDate,raceName:prof.race_name||"",raceKm:Number(prof.race_km)||S.profile.raceKm,raceHm:Number(prof.race_hm)||0,raceId:prof.race_id||"",raceType:prof.race_type||"",planType:prof.plan_type||"",planCustom:prof.plan_custom||{},dogInfo:prof.dog_info||{},myGoals:Array.isArray(prof.my_goals)?prof.my_goals:[],cover:prof.cover||"",nickname:prof.nickname||"",lisens:prof.lisens||"",races:Array.isArray(prof.races)?prof.races:[],dogs:Array.isArray(prof.dogs)?prof.dogs.slice():[]};
   else{
     ok(await sb.from("profiles").insert(profileRow(S.profile)));
     S.isNew=true;S.view="velkommen";
@@ -289,9 +289,10 @@ const REP={list:[],at:0,loading:false};
 let bigMap=null, trailLayer=null, pickMarker=null;
 const TRAIL_CACHE={};
 async function loadReports(force){
+  if(DEMO)return; // Demoen har faste føremeldinger fra demo-data.js
   if(REP.loading||(!force&&Date.now()-REP.at<5*60e3))return;
   REP.loading=true;
-  try{REP.list=ok(await sb.from("foremeldinger").select("*").gte("created_at",new Date(Date.now()-14*864e5).toISOString()).order("created_at",{ascending:false}).limit(500));REP.at=Date.now()}
+  try{REP.list=ok(await sb.from("foremeldinger").select("*").gte("created_at",new Date(Date.now()-14*864e5).toISOString()).order("created_at",{ascending:false}).limit(500))||[];REP.at=Date.now()}
   catch(e){REP.at=Date.now()}
   REP.loading=false;
   if(S.view==="hjem"||S.view==="kart")render();
@@ -421,6 +422,10 @@ function loadImgs(){
 const imgTag=(path,cls,alt)=>`<img class="${cls}" data-path="${esc(path)}" alt="${esc(alt||"")}">`;
 const allImagePaths=()=>[...S.sessions.flatMap(s=>s.bilder||[]),...Object.values(S.profile.dogInfo||{}).map(i=>i.photo),S.profile.cover].filter(Boolean);
 
+function upcomingRaces(){
+  const list=otherRaces().filter(r=>r.date>=iso(todayD()));
+  return list.length?`<p class="small center muted" style="margin-top:4px">Også: ${list.slice(0,3).map(r=>`${esc(r.name)} ${esc(fmtD(parse(r.date)))}`).join(" · ")}${list.length>3?` og ${list.length-3} til`:""}</p>`:"";
+}
 function trackCard(){
   const t=trkLoad();
   if(t&&t.done)return `<p class="notice center" style="margin-top:12px">${icon("route","sm")} Du har en sporet tur på ${fmtKm(t.m/1000)} km som ikke er lagret.</p><div class="actions" style="margin-top:8px"><button type="button" class="btn" id="trackSave">Lagre turen</button><button type="button" class="btn line" id="trackDiscard">Slett</button></div>`;
@@ -443,6 +448,7 @@ function vHome(){
   return `<div class="home">
   ${S.profile.cover?`<div class="cover">${imgTag(S.profile.cover,"","Forsidebilde")}</div>`:""}
   <section class="hero">${hero}</section>${(()=>{const low=/lavterskel|lysløype|nissesprint/i.test(S.profile.raceName||"");return parse(S.profile.raceDate)>=todayD()&&!low&&!licenseOk()?`<p class="notice center" style="margin-top:10px">${icon("info","sm")} Husk startlisens til løpet. <a href="${window.LICENSE.buy}" target="_blank" rel="noopener">Kjøp i Min idrett</a></p>`:""})()}<p class="race center">${esc(S.profile.raceName||"Løpet")} ${race.toLocaleDateString("nb-NO",{weekday:"long",day:"numeric",month:"long"})} – ${fmtKm(S.profile.raceKm)} km${S.profile.raceHm?` og ${S.profile.raceHm} høydemeter`:""}</p>
+  ${upcomingRaces()}
   ${progressCard(t)}
   ${trackCard()}
   ${trail(bw,t)}
@@ -910,7 +916,7 @@ function vPlan(){
   PLAN.map((wk,i)=>{const m=addDays(start,i*7),g=weekTotals(i),got=sum(bw[iso(m)]||[],"km");
     return `<section class="wk"><div class="wkhead"><h3>Uke ${isoWeek(m)}</h3><span class="muted">${got?`<span class="${got>=g.km?"hit":""}">${fmtKm(got)}</span> / `:""}${g.km} km</span></div><p class="phase">${esc(wk.f)} · ${fmtD(m)}–${fmtD(addDays(m,6))} · ${g.hm} hm</p>
     ${wk.d.map((it,d)=>{const dt=addDays(m,d),key=it[3];
-      return `<button type="button" data-pdate="${iso(dt)}" class="${["pday",!it[1]?"rest":"",(it[1]?doneDog:doneAny).has(iso(dt))&&it[0]!=="Hvile"?"done":"",key?"key":"",it[4]?"own":"",iso(dt)===iso(t)?"istoday":""].join(" ")}"><span class="cond" style="font-weight:600">${DAYS[d]} <span class="muted" style="font-weight:500">${dt.getDate()}.${dt.getMonth()+1}</span></span><span class="pt">${esc(it[0])}</span><span class="muted">${it[1]?it[1]+" km":""}</span></button>`}).join("")}</section>`}).join("")+
+      return `<button type="button" data-pdate="${iso(dt)}" class="${["pday",!it[1]?"rest":"",(it[1]?doneDog:doneAny).has(iso(dt))&&it[0]!=="Hvile"?"done":"",key?"key":"",it[4]?"own":"",iso(dt)===iso(t)?"istoday":""].join(" ")}"><span class="cond" style="font-weight:600">${DAYS[d]} <span class="muted" style="font-weight:500">${dt.getDate()}.${dt.getMonth()+1}</span></span><span class="pt">${esc(it[0])}${(()=>{const o=otherRaces().find(r=>r.date===iso(dt));return o?`<br><b class="small">${icon("flag","sm")} ${esc(o.name)}</b>`:""})()}</span><span class="muted">${it[1]?it[1]+" km":""}</span></button>`}).join("")}</section>`}).join("")+
   (Object.keys(S.profile.planCustom||{}).length?`<div class="actions"><button class="btn ghost" id="resetPlan">Tilbakestill alle egne endringer</button></div>`:"");
 }
 
@@ -923,10 +929,50 @@ function raceOptions(sel){
   return `<option value="">Eget løp</option>`+(old?`<option value="${esc(old.id)}" selected>${esc(old.name)}</option>`:"")+
     Object.entries(groups).map(([m,rs])=>`<optgroup label="${esc(m[0].toUpperCase()+m.slice(1))}">${rs.map(r=>`<option value="${esc(r.id)}" ${r.id===cur?"selected":""}>${esc(fmtD(parse(r.date)))} · ${esc(r.name)}</option>`).join("")}</optgroup>`).join("");
 }
-function classSelect(sel){
+function classSelect(sel,id="r-class"){
   const r=raceById(sel), c=String(sel||"").split("|")[1]||"";
   if(!r||!r.classes.length)return "";
-  return `<label for="r-class">Klasse</label><select id="r-class"><option value="">Velg klasse</option>${r.classes.map(k=>`<option value="${esc(k.name)}" ${k.name===c?"selected":""}>${esc(k.name)} · ${fmtKm(k.km)} km</option>`).join("")}</select>`;
+  return `<label for="${id}">Klasse</label><select id="${id}"><option value="">Velg klasse</option>${r.classes.map(k=>`<option value="${esc(k.name)}" ${k.name===c?"selected":""}>${esc(k.name)} · ${fmtKm(k.km)} km</option>`).join("")}</select>`;
+}
+// Flere løp: lagres i profiles.races som [{id, raceId, name, date, km, hm}]. Hovedløpet ligger i race_*-feltene.
+const otherRaces=()=>(S.profile.races||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+const raceCountdown=d=>{const n=Math.round((parse(d)-todayD())/864e5);return n>0?` · om ${n} ${n===1?"dag":"dager"}`:n===0?" · i dag":" · kjørt"};
+async function saveRaces(list){ok(await sb.from("profiles").update({races:list,updated_at:new Date().toISOString()}).eq("user_id",S.user.id));S.profile.races=list}
+function openRaceForm(){
+  panel.innerHTML=`<div class="row"><h2 id="formTitle" style="margin:0">Legg til løp</h2><button class="btn ghost" id="xClose">Lukk</button></div>
+  <div class="field"><label for="x-pick">Løp</label><select id="x-pick">${raceOptions("")}</select></div>
+  <div class="field" id="x-classWrap"></div>
+  <div class="field"><label for="x-name">Navn på løpet</label><input id="x-name" maxlength="60" placeholder="F.eks. Finnskogløpet"></div>
+  <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="x-date">Dato</label><input id="x-date" type="date"></div><div><label for="x-km">Distanse (km)</label><input id="x-km" inputmode="decimal" placeholder="Valgfritt"></div></div>
+  <p class="err" id="xErr" hidden></p>
+  <div class="actions"><button class="btn" id="xSave">Legg til</button></div>`;
+  const $=id=>panel.querySelector("#"+id);
+  $("xClose").onclick=closeForm;
+  const fillClass=()=>{const r=raceById($("x-pick").value),c=$("x-class"),k=r&&c&&r.classes.find(x=>x.name===c.value);if(k)$("x-km").value=fmtKm(k.km)};
+  $("x-pick").onchange=()=>{
+    const r=raceById($("x-pick").value);
+    $("x-classWrap").innerHTML=classSelect($("x-pick").value,"x-class");
+    if(r){$("x-name").value=r.name;$("x-date").value=r.date;$("x-km").value="";const c=$("x-class");if(c){c.onchange=fillClass;if(r.classes.length===1){c.value=r.classes[0].name;fillClass()}}}
+  };
+  $("xSave").onclick=async()=>{
+    const pick=$("x-pick").value,c=$("x-class"),name=$("x-name").value.trim(),date=$("x-date").value;
+    if(!date)return showErr("xErr",{message:"Velg en dato."});
+    if(!name)return showErr("xErr",{message:"Skriv inn navnet på løpet."});
+    const r={id:"r"+Date.now().toString(36),raceId:pick?pick+(c&&c.value?"|"+c.value:""):"",name:name+(c&&c.value?` – ${c.value}`:""),date,km:num($("x-km").value)||0,hm:0};
+    $("xSave").disabled=true;
+    try{await saveRaces([...(S.profile.races||[]),r]);closeForm();toast("Løpet er lagt til");render()}
+    catch(e){$("xSave").disabled=false;showErr("xErr",e)}
+  };
+  sheet.classList.add("open");
+}
+// Bytter plass på hovedløpet og et av de andre løpene
+async function makeMainRace(id){
+  const p=S.profile,r=(p.races||[]).find(x=>x.id===id);if(!r)return;
+  const old={id:"r"+Date.now().toString(36),raceId:p.raceId,name:p.raceName||"Løp",date:p.raceDate,km:p.raceKm,hm:p.raceHm||0};
+  const races=[...(p.races||[]).filter(x=>x.id!==id),old];
+  const prof={...p,raceId:r.raceId,raceName:r.name,raceDate:r.date,raceKm:r.km||p.raceKm,raceHm:r.hm||0};
+  ok(await sb.from("profiles").update({...profileRow(prof),races,updated_at:new Date().toISOString()}).eq("user_id",S.user.id));
+  S.profile={...prof,races};await refresh();toast(`${r.name} er nå hovedløpet`);
 }
 function raceSource(sel){
   const r=raceById(sel);
@@ -974,7 +1020,7 @@ function vSettings(){
   ${p.cover?`<div class="cover small">${imgTag(p.cover,"","Forsidebilde")}</div>`:""}
   <div class="actions"><button type="button" class="btn line" id="coverBtn">${p.cover?"Bytt bilde":"Velg bilde"}</button>${p.cover?`<button type="button" class="btn ghost" id="coverRm">Fjern</button>`:""}</div><input type="file" id="coverFile" accept="image/*" hidden>
   ${sh("flag","Målet ditt","plan")}
-  <p class="muted">Velg et løp fra kalenderen, eller fyll inn ditt eget. Treningsplanen på ${PLAN_WEEKS} uker lages ut fra løpet.</p>
+  <p class="muted">Hovedløpet ditt. Velg et løp fra kalenderen, eller fyll inn ditt eget. Treningsplanen på ${PLAN_WEEKS} uker lages ut fra dette løpet.</p>
   <div class="field"><label for="r-pick">Løp</label><select id="r-pick">${raceOptions(p.raceId)}</select></div>
   <div class="field" id="r-classWrap">${classSelect(p.raceId)}</div>
   <p class="small muted" id="r-src" style="margin-top:6px">${raceSource(p.raceId)}</p>
@@ -982,6 +1028,11 @@ function vSettings(){
   <div class="field"><label for="race">Dato</label><input id="race" type="date" value="${esc(p.raceDate)}"></div>
   <div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="r-km">Distanse (km)</label><input id="r-km" inputmode="decimal" value="${esc(fmtKm(p.raceKm))}"></div>
    <div><label for="r-hm">Høydemeter</label><input id="r-hm" inputmode="numeric" value="${esc(p.raceHm||"")}" placeholder="Ukjent"></div></div>
+  ${sh("flag","Flere løp","plan")}
+  <p class="muted">Andre løp du vil være med på i sesongen. De vises på Oversikt og i planen.</p>
+  <div class="list">${otherRaces().map(r=>`<div class="lrow"><span><b>${esc(r.name||"Løp")}</b><br><span class="small muted">${esc(fmtD(parse(r.date)))} ${parse(r.date).getFullYear()}${r.km?` · ${fmtKm(r.km)} km`:""}${raceCountdown(r.date)}</span></span>
+   <span style="display:flex;gap:6px"><button type="button" class="btn ghost sm" data-rmain="${esc(r.id)}">Gjør til hovedløp</button><button type="button" class="btn ghost sm" data-rdel="${esc(r.id)}" aria-label="Fjern ${esc(r.name)}">Fjern</button></span></div>`).join("")||`<p class="small muted">Ingen andre løp lagt til.</p>`}</div>
+  <div class="actions" style="margin-top:10px"><button type="button" class="btn ghost" id="addRace">+ Legg til løp</button></div>
   ${sh("target","Gren og klasse","plan")}
   <p class="muted">Grenen bestemmer hvordan planen bygges opp, og hvilke regler som gjelder.</p>
   <div class="field"><label for="g-gren">Gren</label><select id="g-gren">${grenOptions(grenFor(p).id)}</select></div>
@@ -1360,6 +1411,9 @@ async function importData(file){
 function bind(){
   const pws=document.getElementById("pwSave");if(pws)pws.onclick=async()=>{const v=document.getElementById("newpw").value;if(v.length<8)return toast("Passordet må ha minst 8 tegn");const r=await sb.auth.updateUser({password:v});if(r.error)toast(errText(r.error));else{document.getElementById("newpw").value="";toast("Passordet er lagret")}};
   const tri=document.getElementById("trImport");if(tri)tri.onclick=openTractive;
+  const ar=document.getElementById("addRace");if(ar)ar.onclick=openRaceForm;
+  document.querySelectorAll("[data-rdel]").forEach(b=>b.onclick=async()=>{const r=(S.profile.races||[]).find(x=>x.id===b.dataset.rdel);if(!r||!confirm(`Fjerne ${r.name}?`))return;try{await saveRaces(S.profile.races.filter(x=>x!==r));render()}catch(e){toast(errText(e))}});
+  document.querySelectorAll("[data-rmain]").forEach(b=>b.onclick=async()=>{try{await makeMainRace(b.dataset.rmain)}catch(e){toast(errText(e))}});
   ["trackStart","trackStart2"].forEach(id=>{const b=document.getElementById(id);if(b)b.onclick=openTrack});
   const tsv=document.getElementById("trackSave");if(tsv)tsv.onclick=saveTrack;
   const tds=document.getElementById("trackDiscard");if(tds)tds.onclick=discardTrack;
