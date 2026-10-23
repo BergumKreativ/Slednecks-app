@@ -724,7 +724,9 @@ function feedSection(n){
   ${i.feedId==="custom"?`<div class="field grid3" style="grid-template-columns:1fr 1fr"><div><label for="fd-name">Navn</label><input id="fd-name" value="${esc(i.feedName||"")}" maxlength="50" placeholder="Fôrets navn"></div>
    <div><label for="fd-kcal">kcal per 100 g</label><input id="fd-kcal" inputmode="decimal" value="${esc(i.feedKcal||"")}" placeholder="Står på sekken"></div></div>
    <p class="small muted" style="margin-top:4px">Står energien i MJ per kg, gang med 23,9 for å få kcal per 100 g.</p>`:""}
-  ${fd&&fd.url?`<p class="small muted" style="margin-top:4px">Energiinnhold fra <a href="${esc(fd.url)}" target="_blank" rel="noopener">produsenten</a>. Sjekk sekken, oppskrifter endres.</p>`:""}
+  ${fd&&fd.supplement?`<p class="small warntext" style="margin-top:4px">Dette er et tilskuddsfôr, ikke fullfôr. Det bør ikke være det eneste hunden spiser.</p>`:""}
+  ${fd&&fd.note?`<p class="small muted" style="margin-top:4px">${esc(fd.note)}</p>`:""}
+  ${fd&&fd.url?`<p class="small muted" style="margin-top:4px">${fd.protein?`${String(fd.protein).replace(".",",")} % protein · ${String(fd.fat).replace(".",",")} % fett · `:""}Energiinnhold fra <a href="${esc(fd.url)}" target="_blank" rel="noopener">produktarket</a>. Sjekk sekken, oppskrifter endres.</p>`:""}
   <div class="actions"><button class="btn" id="fdSave">Lagre fôring</button></div>
   <p class="small muted" style="margin-top:8px">Veiledende: behovet varierer mye mellom hunder. Juster etter holdet (BCS) og vekten over tid. Gi gjerne litt ekstra på dager med lange turer og i kulde. Snacks teller også med.</p>`;
 }

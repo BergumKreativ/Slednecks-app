@@ -1,3 +1,30 @@
-// Fôr med energiinnhold (kcal omsettelig energi per 100 g, slik det gis). Kilde-URL per produkt.
-// Oppdater når produsentene endrer oppskrifter. Brukere kan alltid skrive inn tallet fra sekken selv.
-window.FEEDS = [];
+// Fôr med energiinnhold (kcal omsettelig energi per 100 g, slik det gis), hentet fra produsentens eller
+// forhandlerens produktark 23.10.2026. Kilde-URL per produkt. Oppskrifter endres – oppdater jevnlig.
+// supplement: tilskuddsfôr, ikke fullfôr. note: forbehold som vises i appen.
+window.FEEDS = [
+  {id:"appetitt-energy", brand:"Appetitt (Felleskjøpet)", product:"Energy", type:"tørr", kcal100:454.1, protein:26, fat:23, url:"https://web-assets.felleskjopet.no/productassets/4ebe9e68-a6f8-4c91-933e-4207c5069fcf/12860_base-produktark-appetitt-dog-energy10.pdf"},
+  {id:"appetitt-extreme", brand:"Appetitt (Felleskjøpet)", product:"Extreme", type:"tørr", kcal100:509.6, protein:29, fat:33, url:"https://web-assets.felleskjopet.no/productassets/c9e84f4e-21aa-44be-82ad-eaffb750d468/12862_base-produktark-appetitt-dog-extreme10.pdf"},
+  {id:"appetitt-maint-medium", brand:"Appetitt (Felleskjøpet)", product:"Maintenance Medium Breed", type:"tørr", kcal100:424.2, protein:25, fat:16, url:"https://web-assets.felleskjopet.no/productassets/ba0068f5-b28f-40b9-9f3c-bf4c51e133c3/12867_base-produktark-appetitt-maintenance-medium-breed-6091011.pdf"},
+  {id:"appetitt-polse-energy", brand:"Appetitt (Felleskjøpet)", product:"Energy Sport hundepølse", type:"våt", kcal100:163.0, protein:16, fat:13, url:"https://web-assets.felleskjopet.no/productassets/4f7a4b10-462b-49fd-858a-034100ff5596/50341927_base-produktark-appetitt-poelse-energy-sport10.pdf"},
+  {id:"labb-ekstrem", brand:"Labb (Felleskjøpet)", product:"Ekstrem Energi", type:"tørr", kcal100:471.1, protein:28, fat:30, url:"https://web-assets.felleskjopet.no/productassets/338e5037-36c8-4ae9-a289-2863963d5ece/12363_base-produktark-2026-labb-hund-ekstrem-energi.pdf"},
+  {id:"labb-aktiv", brand:"Labb (Felleskjøpet)", product:"Aktiv alle raser", type:"tørr", kcal100:429.0, protein:26, fat:22, url:"https://web-assets.felleskjopet.no/productassets/b0fc32f5-d767-4f0e-9370-798034c30691/12361_base-produktark-2026-labb-hund-aktiv.pdf"},
+  {id:"labb-vat-energi", brand:"Labb (Felleskjøpet)", product:"Våtfôr Energi (boks)", type:"våt", kcal100:223.7, protein:12, fat:20, supplement:true, url:"https://web-assets.felleskjopet.no/productassets/ae6aec6e-1e1a-44be-921d-86cf4a2ab026/50313013_base-produktarka11.pdf"},
+  {id:"vom-active-original", brand:"VOM og Hundemat", product:"VOM Active Original", type:"rå", kcal100:222.0, protein:15, fat:18, url:"https://vomoghundemat.no/produkter/vom-active-serien/"},
+  {id:"vom-active-salmon", brand:"VOM og Hundemat", product:"VOM Active with Salmon", type:"rå", kcal100:244.0, protein:16, fat:20, url:"https://vomoghundemat.no/produkter/vom-active-serien/"},
+  {id:"vom-active-protein", brand:"VOM og Hundemat", product:"VOM Active Protein Rich", type:"rå", kcal100:194.0, protein:17, fat:14, url:"https://vomoghundemat.no/produkter/vom-active-serien/"},
+  {id:"vom-active-whitefish", brand:"VOM og Hundemat", product:"VOM Active with White Fish", type:"rå", kcal100:195.0, protein:15, fat:15, url:"https://vomoghundemat.no/produkter/vom-active-serien/"},
+  {id:"vom-hunt", brand:"VOM og Hundemat", product:"VOM Hunt", type:"rå", kcal100:228.0, protein:15, fat:18, url:"https://vomoghundemat.no/produkter/vom-hunt/"},
+  {id:"vom-boost", brand:"VOM og Hundemat", product:"VOM Boost (energitilskudd)", type:"rå", kcal100:331.0, protein:13, fat:31, supplement:true, url:"https://vomoghundemat.no/produkter/vom-boost/"},
+  {id:"mush-vaisto-okse-gris-kylling", brand:"Mush", product:"Vaisto okse-gris-kylling", type:"rå", kcal100:209.0, protein:14.9, fat:15.8, note:"Forhandleren oppgir energi uten å si om det er omsettelig energi.", url:"https://www.felleskjopet.no/produkt/kjaeledyr/hund/hundefor/raafor/hundefor-vaisto-okse-gris-kylling-frosset-10-kg-50330351_BASE"},
+  {id:"rc-energy-trail-4300", brand:"Royal Canin", product:"Sporting Life Energy Trail 4300", type:"tørr", kcal100:407.7, protein:28, fat:21, url:"https://www.zooplus.no/shop/hund/torrfor_hund/royalcanin_club_selection/1950507"},
+  {id:"rc-club-energy-he", brand:"Royal Canin", product:"Club Energy HE", type:"tørr", kcal100:405.0, protein:30, fat:16, url:"https://www.zooplus.no/shop/hund/torrfor_hund/royalcanin_club_selection/royalcanin_specialclub/367499"},
+  {id:"proplan-medium-adult", brand:"Purina Pro Plan", product:"Medium Adult 1+ Everyday Nutrition (kylling)", type:"tørr", kcal100:389.5, protein:26, fat:16, note:"Tallet er fra Purina Frankrike (beregnet etter NRC 2006).", url:"https://vetcenter.purina.fr/products/purina-pro-plan-medium-adult-1-everyday-nutrition-riche-en-poulet"},
+  {id:"eukanuba-working-endurance", brand:"Eukanuba", product:"Adult Working & Endurance", type:"tørr", kcal100:392.3, protein:30.75, fat:20.75, url:"https://www.felleskjopet.no/produkt/kjaeledyr/hund/hundefor/toerrfor/hundefor-adult-working--endurance-15-kg-50329422_BASE"},
+  {id:"hills-performance", brand:"Hill's", product:"Science Plan Performance Adult kylling", type:"tørr", kcal100:416.0, protein:28.7, fat:23.9, url:"https://www.hillspet.no/dog-food/sp-canine-science-plan-adult-performance-chicken-dry"},
+  {id:"acana-sport-agility", brand:"Acana", product:"Sport & Agility", type:"tørr", kcal100:372.5, protein:35, fat:22, url:"https://emea.acana.com/en/dogs/dog-food/eu-aca-sport-agility.html"},
+  {id:"acana-adult", brand:"Acana", product:"Adult Dog", type:"tørr", kcal100:351.0, protein:29, fat:17, url:"https://emea.acana.com/en/dogs/dog-food/eu-aca-adult.html"},
+  {id:"orijen-original", brand:"Orijen", product:"Original", type:"tørr", kcal100:386.0, protein:38, fat:18, url:"https://emea.orijenpetfoods.com/en/dogs/dog-food/eu-ori-ns-ori-original.html"},
+  {id:"orijen-six-fish", brand:"Orijen", product:"Six Fish", type:"tørr", kcal100:388.0, protein:38, fat:18, url:"https://emea.orijenpetfoods.com/en/dogs/dog-food/eu-ori-ns-ori-sixfish.html"},
+  {id:"brit-pbn-sport", brand:"Brit", product:"Premium by Nature Sport", type:"tørr", kcal100:420.0, protein:31, fat:22, url:"https://brit.pet/en/products/brit-premium-by-nature-sport"},
+  {id:"magnussons-original-kennel", brand:"Magnussons", product:"Original Kennel", type:"tørr", kcal100:339.4, protein:25, fat:12, url:"https://www.zooplus.no/shop/hund/torrfor_hund/magnussons/1930423"},
+];
